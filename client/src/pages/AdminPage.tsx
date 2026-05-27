@@ -23,6 +23,8 @@ import {
   getCabinets,
   createBackup,
   rollbackBackup as apiRollbackBackup,
+  deleteBackup,
+  deleteAutoBackups,
   createTag,
   deleteTag as apiDeleteTag,
   createZone,
@@ -68,6 +70,7 @@ const LOG_TYPE_LABELS: Record<string, string> = {
   import_cabinets: '导入柜机',
   export_cabinets: '导出柜机',
   create_backup: '创建备份',
+  delete_backup: '删除备份',
   rollback: '回滚版本',
   login: '登录',
   logout: '登出',
@@ -232,6 +235,35 @@ const AdminPage: React.FC = () => {
       loadData();
     } catch (err: any) {
       alert('回滚失败: ' + err.message);
+    }
+  };
+
+  const handleDeleteBackup = async (backup: Backup) => {
+    if (!window.confirm(
+      `确定要删除${backup.type === 'auto' ? '自动' : '手动'}备份 v${backup.version}${backup.remark ? ` ("${backup.remark}")` : ''} 吗？\n\n此操作不可撤销！`
+    )) return;
+
+    try {
+      await deleteBackup(backup.id);
+      const b = await getBackups();
+      setBackups(b);
+    } catch (err: any) {
+      alert('删除失败: ' + (err.message || '未知错误'));
+    }
+  };
+
+  const handleClearAutoBackups = async () => {
+    if (!window.confirm(
+      '确定要清除多余自动备份吗？\n\n将保留最新 10 个自动备份，其余全部删除。手动备份不受影响。'
+    )) return;
+
+    try {
+      const result = await deleteAutoBackups();
+      alert(result.message);
+      const b = await getBackups();
+      setBackups(b);
+    } catch (err: any) {
+      alert('清除失败: ' + (err.message || '未知错误'));
     }
   };
 
@@ -519,25 +551,57 @@ const AdminPage: React.FC = () => {
                 {creatingBackup ? '创建中...' : '创建主备份'}
               </button>
             </div>
+            {backups.length > 0 && (
+              <div className="backup-actions">
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={handleClearAutoBackups}
+                  title="保留最新10个自动备份，清除其余自动备份"
+                >
+                  <Trash2 size={14} /> 一键清除多余自动备份
+                </button>
+              </div>
+            )}
             <div className="backup-list">
               {backups.length === 0 ? (
                 <div className="empty-state">暂无备份</div>
               ) : (
-                backups.map((backup) => (
-                  <div key={backup.id} className="backup-item">
-                    <div className="backup-info">
-                      <span className="backup-version">
-                        v{backup.version}
-                        <span className={`backup-type ${backup.type}`}>{backup.type === 'auto' ? '自动' : '手动'}</span>
-                      </span>
-                      {backup.remark && <span className="backup-remark">{backup.remark}</span>}
-                      <span className="backup-time">{new Date(backup.createdAt).toLocaleString('zh-CN')}</span>
-                    </div>
-                    <button className="btn btn-outline btn-sm" onClick={() => handleRollback(backup)}>
-                      <RotateCcw size={12} /> 回滚
-                    </button>
-                  </div>
-                ))
+                (() => {
+                  const manualBackups = backups.filter((b) => b.type === 'manual').sort((a, b) => b.version - a.version);
+                  const autoBackups = backups.filter((b) => b.type === 'auto').sort((a, b) => a.version - b.version);
+                  const protectedManualIds = new Set(manualBackups.slice(0, 3).map((b) => b.id));
+                  const protectedAutoIds = new Set(autoBackups.slice(0, 10).map((b) => b.id));
+
+                  return backups.map((backup) => {
+                    const isProtected = backup.type === 'manual'
+                      ? protectedManualIds.has(backup.id)
+                      : protectedAutoIds.has(backup.id);
+
+                    return (
+                      <div key={backup.id} className="backup-item">
+                        <div className="backup-info">
+                          <span className="backup-version">
+                            v{backup.version}
+                            <span className={`backup-type ${backup.type}`}>{backup.type === 'auto' ? '自动' : '手动'}</span>
+                            {isProtected && <Lock size={12} className="backup-locked" title="受保护，不可删除" />}
+                          </span>
+                          {backup.remark && <span className="backup-remark">{backup.remark}</span>}
+                          <span className="backup-time">{new Date(backup.createdAt).toLocaleString('zh-CN')}</span>
+                        </div>
+                        <div className="backup-item-actions">
+                          <button className="btn btn-outline btn-sm" onClick={() => handleRollback(backup)}>
+                            <RotateCcw size={12} /> 回滚
+                          </button>
+                          {!isProtected && (
+                            <button className="btn btn-outline btn-sm btn-danger" onClick={() => handleDeleteBackup(backup)}>
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()
               )}
             </div>
           </div>
@@ -952,6 +1016,26 @@ const AdminPage: React.FC = () => {
         .backup-time {
           font-size: 12px;
           color: var(--color-text-muted);
+        }
+        .backup-actions {
+          margin-bottom: 10px;
+        }
+        .backup-locked {
+          color: #f59e0b;
+          flex-shrink: 0;
+        }
+        .backup-item-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        .btn-danger {
+          color: #ef4444;
+          border-color: #fecaca;
+        }
+        .btn-danger:hover {
+          background: #fef2f2;
         }
         .tag-add-row {
           display: flex;

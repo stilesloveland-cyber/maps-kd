@@ -272,6 +272,23 @@
         "提供'Try it out'功能，可在文档页面直接测试接口",
         "在后台管理页面的⚙️系统信息卡片中添加'API文档'入口链接"
       ]
+    },
+    {
+      "id": "F018",
+      "name": "备份清理管理",
+      "description": "管理员可在后台版本管理面板中清理旧备份，支持一键清除多余自动备份、单独删除手动备份，并有锁定保护机制确保最近的重要备份不被删除。",
+      "acceptanceCriteria": [
+        "备份列表按版本号倒序排列，最新的在前",
+        "最新的3个手动备份（按版本号排序，非时间排序）被锁定保护，不允许删除",
+        "最新的10个自动备份（按版本号排序）被锁定保护，不允许删除",
+        "一键清除多余的自动备份（保留最新10个自动备份，其余自动备份全部删除）",
+        "一键清除操作仅删除自动备份，不影响任何手动备份",
+        "手动备份支持单个删除（除最新3个手动备份外，其余可逐条删除）",
+        "删除操作前弹出确认对话框",
+        "删除备份后刷新列表，操作记录写入日志",
+        "后端 DELETE /api/backups/:id 删除单个备份（手动备份，受最近3个保护）",
+        "后端 DELETE /api/backups/auto 批量删除多余自动备份（保留最近10个）"
+      ]
     }
   ],
   "dataModel": {
@@ -375,6 +392,8 @@
       { "method": "GET", "path": "/api/backups", "description": "获取备份列表（需登录）" },
       { "method": "POST", "path": "/api/backups", "description": "创建手动主备份（需登录）" },
       { "method": "POST", "path": "/api/backups/:id/rollback", "description": "回滚到指定备份版本（需登录）" },
+      { "method": "DELETE", "path": "/api/backups/:id", "description": "删除指定备份（需登录，手动备份，受最近3个手动备份保护）" },
+      { "method": "DELETE", "path": "/api/backups/auto", "description": "批量删除多余自动备份，保留最近10个（需登录）" },
       { "method": "GET", "path": "/api/stats", "description": "获取系统概览统计（需登录：柜机数、标签数、备份数、今日操作数、版本号、数据库大小）" },
       { "method": "GET", "path": "/api/cabinets/export", "description": "导出柜机数据为 .xlsx 文件（需登录）" },
       { "method": "POST", "path": "/api/cabinets/import", "description": "从 .xlsx 文件批量导入柜机（需登录）" },

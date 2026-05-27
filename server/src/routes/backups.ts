@@ -165,4 +165,113 @@ router.post('/:id/rollback', authMiddleware, (req: Request, res: Response): void
   });
 });
 
+/**
+ * @swagger
+ * /api/backups/auto:
+ *   delete:
+ *     summary: 批量清除多余自动备份
+ *     description: 保留最新10个自动备份，删除其余自动备份。不影响手动备份。（需登录）
+ *     tags: [版本管理]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 清除完成，返回删除数量
+ */
+router.delete('/auto', authMiddleware, (req: Request, res: Response): void => {
+  const db = getDatabase();
+
+  const protectedIds = db.prepare(
+    'SELECT id FROM backups WHERE type = ? ORDER BY version DESC LIMIT 10'
+  ).all('auto') as Array<{ id: string }>;
+
+  const protectedIdSet = new Set(protectedIds.map((b) => b.id));
+
+  if (protectedIds.length <= 10) {
+    const allAutos = db.prepare('SELECT COUNT(*) AS cnt FROM backups WHERE type = ?').get('auto') as { cnt: number };
+    if (allAutos.cnt <= 10) {
+      res.json({ deleted: 0, message: '自动备份数量未超过10个，无需清理' });
+      return;
+    }
+  }
+
+  const result = db.prepare(
+    'DELETE FROM backups WHERE type = ? AND id NOT IN (' +
+    protectedIds.map(() => '?').join(',') +
+    ')'
+  ).run('auto', ...protectedIds.map((b) => b.id));
+
+  addLog('delete_backup', `批量清除自动备份，删除 ${result.changes} 条（保留最新 ${protectedIds.length} 条）`, req.admin!.username);
+
+  res.json({ deleted: result.changes, message: `已清除 ${result.changes} 条自动备份，保留最新 ${protectedIds.length} 条` });
+});
+
+/**
+ * @swagger
+ * /api/backups/{id}:
+ *   delete:
+ *     summary: 删除单个备份
+ *     description: 删除指定备份记录。手动备份受最近3个保护，不允许删除。（需登录）
+ *     tags: [版本管理]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ *       400:
+ *         description: 该备份受保护，不允许删除
+ *       404:
+ *         description: 备份不存在
+ */
+router.delete('/:id', authMiddleware, (req: Request, res: Response): void => {
+  const id: string = req.params.id;
+
+  const db = getDatabase();
+  const backup = db.prepare('SELECT * FROM backups WHERE id = ?').get(id) as {
+    id: string; version: number; type: string; remark: string | null;
+  } | undefined;
+
+  if (!backup) {
+    res.status(404).json({ error: '备份不存在' });
+    return;
+  }
+
+  if (backup.type === 'manual') {
+    const latestManualIds = db.prepare(
+      'SELECT id FROM backups WHERE type = ? ORDER BY version DESC LIMIT 3'
+    ).all('manual') as Array<{ id: string }>;
+
+    if (latestManualIds.some((b) => b.id === id)) {
+      res.status(400).json({ error: '该手动备份属于最近3个版本，受保护不允许删除' });
+      return;
+    }
+  }
+
+  if (backup.type === 'auto') {
+    const latestAutoIds = db.prepare(
+      'SELECT id FROM backups WHERE type = ? ORDER BY version DESC LIMIT 10'
+    ).all('auto') as Array<{ id: string }>;
+
+    if (latestAutoIds.some((b) => b.id === id)) {
+      res.status(400).json({ error: '该自动备份属于最近10个版本，受保护不允许删除' });
+      return;
+    }
+  }
+
+  db.prepare('DELETE FROM backups WHERE id = ?').run(id);
+
+  const label: string = backup.type === 'manual' && backup.remark
+    ? `v${backup.version} ("${backup.remark}")`
+    : `v${backup.version}`;
+  addLog('delete_backup', `删除${backup.type === 'auto' ? '自动' : '手动'}备份 ${label}`, req.admin!.username);
+
+  res.json({ success: true, message: `已删除备份 v${backup.version}` });
+});
+
 export default router;

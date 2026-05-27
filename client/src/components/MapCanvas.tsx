@@ -165,6 +165,9 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const touchStagePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // 柜机拖拽中标志（避免容器平移逻辑干扰柜机拖拽）
+  const cabinetDraggingRef = useRef(false);
+
   // 鼠标拖拽平移
   const mouseDragRef = useRef<{ isDown: boolean; startX: number; startY: number; stageX: number; stageY: number }>({
     isDown: false, startX: 0, startY: 0, stageX: 0, stageY: 0,
@@ -439,6 +442,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
       }}
       onMouseMove={(e: React.MouseEvent) => {
         if (!mouseDragRef.current.isDown) return;
+        if (cabinetDraggingRef.current) return;
         const dx = e.clientX - mouseDragRef.current.startX;
         const dy = e.clientY - mouseDragRef.current.startY;
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
@@ -656,6 +660,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                 height={h}
                 opacity={opacity}
                 draggable={isAuthenticated && !isFilterActive}
+                onDragStart={() => { cabinetDraggingRef.current = true; }}
                 onClick={(e: Konva.KonvaEventObject<MouseEvent>) => {
                   e.cancelBubble = true;
                   if (isDraggingRef.current) return;
@@ -666,6 +671,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   onSelectCabinet(cabinet.id);
                 }}
                 onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
+                  cabinetDraggingRef.current = false;
                   const node = e.target;
                   const newX = node.x();
                   const newY = node.y();

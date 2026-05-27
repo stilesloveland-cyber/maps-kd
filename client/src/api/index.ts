@@ -207,6 +207,14 @@ export const createBackup = (data: CreateBackupRequest = {}): Promise<Backup> =>
 export const rollbackBackup = (id: string): Promise<{ success: boolean }> =>
   request<{ success: boolean }>(`/api/backups/${id}/rollback`, { method: 'POST' });
 
+/** 删除单个备份（需登录） */
+export const deleteBackup = (id: string): Promise<{ success: boolean }> =>
+  request<{ success: boolean }>(`/api/backups/${id}`, { method: 'DELETE' });
+
+/** 批量清除多余自动备份，保留最新10个（需登录） */
+export const deleteAutoBackups = (): Promise<{ deleted: number; message: string }> =>
+  request<{ deleted: number; message: string }>('/api/backups/auto', { method: 'DELETE' });
+
 // ==================== 统计 API ====================
 
 /** 获取系统概览统计（需登录） */
