@@ -1,8 +1,16 @@
 #!/bin/bash
 
 # =============================================
-#   快递柜可视化地图管理系统 - 一键部署脚本
+#   快递柜可视化地图管理系统 - 部署脚本
 #   支持 Linux / macOS
+#
+#   最简单的方式（无需此脚本）：
+#     git clone https://github.com/stilesloveland-cyber/maps-kd.git
+#     cd maps-kd
+#     sudo docker compose up -d
+#
+#   如需交互式配置（端口/密码/域名），使用本脚本：
+#     chmod +x deploy.sh && ./deploy.sh
 # =============================================
 
 set -e
@@ -129,6 +137,10 @@ fi
 echo -e "${GREEN}║${NC}                                              ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}     管理后台: ${CYAN}/admin${NC}                          ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}     API文档: ${CYAN}/api-docs${NC}                         ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}                                              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}     更简单的方式（下次部署直接）：                    ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}     ${CYAN}git clone https://github.com/stilesloveland-cyber/maps-kd.git${NC} ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}     ${CYAN}&& cd maps-kd && sudo docker compose up -d${NC}    ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}                                              ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}     管理命令:                                    ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}     查看日志: ${CYAN}docker compose logs -f${NC}            ${GREEN}║${NC}"

@@ -6,25 +6,40 @@
 
 ## 🚀 快速部署
 
-### 方式一：Docker 一键部署（推荐）
+### Docker Compose 部署（推荐）
 
-**要求：** 服务器已安装 Docker 和 Docker Compose
+**要求：** 服务器已安装 Git 和 Docker
 
 ```bash
-# Linux / macOS
-chmod +x deploy.sh
-./deploy.sh
+# 1. 克隆项目
+git clone https://github.com/stilesloveland-cyber/maps-kd.git
 
-# Windows PowerShell
-.\deploy.ps1
+# 2. 进入目录
+cd maps-kd
+
+# 3. 一键启动
+sudo docker compose up -d
 ```
 
-部署脚本会引导您完成：
-1. ✅ 自动检测服务器环境（系统、Docker 版本、公网 IP）
-2. 🔌 设置服务端口（默认 3000）
-3. 🔐 设置管理员密码
-4. 🌐 可选配置域名和 Cloudflare
-5. 🐳 自动构建镜像并启动容器
+就这么简单！默认配置即可运行，如需自定义端口或密码，编辑 `.env` 文件：
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑配置（端口、密码等）
+nano .env
+
+# 重新启动
+sudo docker compose up -d
+```
+
+**环境变量说明：**
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `PORT` | 服务端口 | `3000` |
+| `ADMIN_PASSWORD` | 管理员初始密码 | `admin123` |
+| `JWT_SECRET` | JWT 加密密钥 | 自动生成 |
 
 **启动后访问：**
 | 地址 | 说明 |

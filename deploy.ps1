@@ -1,6 +1,14 @@
 # =============================================
-#   快递柜可视化地图管理系统 - 一键部署脚本
+#   快递柜可视化地图管理系统 - 部署脚本
 #   支持 Windows (PowerShell 5+)
+#
+#   最简单的方式（无需此脚本）：
+#     git clone https://github.com/stilesloveland-cyber/maps-kd.git
+#     cd maps-kd
+#     docker compose up -d
+#
+#   如需交互式配置（端口/密码/域名），使用本脚本：
+#     .\deploy.ps1
 # =============================================
 
 Write-Host ""
@@ -131,6 +139,10 @@ if ($domain) {
 Write-Host "║                                              ║" -ForegroundColor Green
 Write-Host "║     管理后台: /admin                          ║" -ForegroundColor Cyan
 Write-Host "║     API文档: /api-docs                         ║" -ForegroundColor Cyan
+Write-Host "║                                              ║" -ForegroundColor Green
+Write-Host "║     更简单的方式（下次部署直接）：                    ║" -ForegroundColor Green
+Write-Host "║     git clone https://github.com/stilesloveland-cyber/maps-kd.git ║" -ForegroundColor Cyan
+Write-Host "║     && cd maps-kd && docker compose up -d        ║" -ForegroundColor Cyan
 Write-Host "║                                              ║" -ForegroundColor Green
 Write-Host "║     管理命令:                                    ║" -ForegroundColor Green
 Write-Host "║     查看日志: docker compose logs -f            ║" -ForegroundColor Cyan
