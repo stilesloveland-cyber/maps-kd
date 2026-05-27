@@ -18,6 +18,7 @@ import type {
   UpdateCabinetRequest,
   UpdatePositionRequest,
   UpdateTagsRequest,
+  BatchGenerateRequest,
   CreateBackupRequest,
   CreateZoneRequest,
   UpdateZoneRequest,
@@ -112,6 +113,13 @@ export const updateCabinetPosition = (id: string, data: UpdatePositionRequest): 
 export const updateCabinetTags = (id: string, data: UpdateTagsRequest): Promise<Cabinet> =>
   request<Cabinet>(`/api/cabinets/${id}/tags`, {
     method: 'PUT',
+    body: JSON.stringify(data),
+  });
+
+/** 批量生成带标签柜机（需登录） */
+export const batchGenerateCabinets = (data: BatchGenerateRequest): Promise<Cabinet[]> =>
+  request<Cabinet[]>('/api/cabinets/batch', {
+    method: 'POST',
     body: JSON.stringify(data),
   });
 

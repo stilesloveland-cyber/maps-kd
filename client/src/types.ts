@@ -146,6 +146,12 @@ export interface CreateBackupRequest {
   remark?: string;
 }
 
+/** 批量生成柜机请求 */
+export interface BatchGenerateRequest {
+  count: number;
+  tagId: string;
+}
+
 /** 创建区域请求 */
 export interface CreateZoneRequest {
   name: string;

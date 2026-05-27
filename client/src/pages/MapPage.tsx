@@ -4,7 +4,7 @@
  * 负责数据加载、状态管理、业务逻辑编排
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Filter, Plus } from 'lucide-react';
+import { Filter, Plus, Layers } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import type { Cabinet, Tag as TagType, Zone, SystemMeta } from '../types';
 import {
@@ -19,12 +19,14 @@ import {
   updateCabinetTags,
   createZone,
   updateZone,
+  batchGenerateCabinets,
 } from '../api';
 import Toolbar from '../components/Toolbar';
 import MapCanvas, { MapCanvasRef } from '../components/MapCanvas';
 import FilterPanel from '../components/FilterPanel';
 import DetailPanel from '../components/DetailPanel';
 import LoginModal from '../components/LoginModal';
+import BatchModal from '../components/BatchModal';
 
 /**
  * 生成随机颜色
@@ -65,6 +67,7 @@ const MapPage: React.FC = () => {
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState<boolean>(false);
+  const [showBatchModal, setShowBatchModal] = useState<boolean>(false);
 
   // 用于触发添加柜机的坐标
   const addPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -135,6 +138,21 @@ const MapPage: React.FC = () => {
       console.error('添加柜机失败:', err);
     }
   }, [isAuthenticated, cabinets]);
+
+  /**
+   * 批量生成带标签柜机
+   */
+  const handleBatchGenerate = useCallback(async (count: number, tagId: string) => {
+    if (!isAuthenticated) return;
+    setShowBatchModal(false);
+    try {
+      const newCabinets = await batchGenerateCabinets({ count, tagId });
+      setCabinets((prev) => [...prev, ...newCabinets]);
+    } catch (err) {
+      console.error('批量生成失败:', err);
+      alert('批量生成失败: ' + (err as Error).message);
+    }
+  }, [isAuthenticated]);
 
   /**
    * 更新柜机名称
@@ -341,6 +359,7 @@ const MapPage: React.FC = () => {
         dataVersion={systemMeta.dataVersion}
         onSearchResult={handleSearchResult}
         onAddCabinet={handleAddCabinet}
+        onBatchGenerate={() => setShowBatchModal(true)}
         onAddZone={handleAddZone}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
@@ -369,38 +388,45 @@ const MapPage: React.FC = () => {
 
         {/* 右侧面板区域（桌面端） */}
         <div className="side-panels">
-          <FilterPanel
-            tags={tags}
-            selectedTags={filterTagIds}
-            onToggleTag={handleToggleFilterTag}
-            onClearFilters={handleClearFilters}
-          />
-          {selectedCabinet && (
-            <DetailPanel
-              cabinet={selectedCabinet}
+          <div className="panel-enter">
+            <FilterPanel
               tags={tags}
-              zones={zones}
-              onClose={() => setSelectedCabinetId(null)}
-              onUpdateName={handleUpdateName}
-              onUpdateTags={handleUpdateTags}
-              onUpdateZone={handleUpdateZone}
-              onDeleteCabinet={handleDeleteCabinet}
+              selectedTags={filterTagIds}
+              onToggleTag={handleToggleFilterTag}
+              onClearFilters={handleClearFilters}
             />
+          </div>
+          {selectedCabinet && (
+            <div className="panel-enter" key={selectedCabinet.id}>
+              <DetailPanel
+                cabinet={selectedCabinet}
+                tags={tags}
+                zones={zones}
+                onClose={() => setSelectedCabinetId(null)}
+                onUpdateName={handleUpdateName}
+                onUpdateTags={handleUpdateTags}
+                onUpdateZone={handleUpdateZone}
+                onDeleteCabinet={handleDeleteCabinet}
+              />
+            </div>
           )}
         </div>
       </div>
 
       {/* 移动端底部操作栏 */}
       <div className="mobile-bottom-bar mobile-only">
-        <button className="btn btn-ghost btn-sm" onClick={() => setMobileFilterOpen(true)}>
-          <Filter size={16} />
-          筛选
+        <button className="fab-btn" onClick={() => setMobileFilterOpen(true)} title="筛选">
+          <Filter size={18} />
         </button>
         {isAuthenticated && (
-          <button className="btn btn-primary btn-sm" onClick={handleAddCabinet}>
-            <Plus size={16} />
-            添加
-          </button>
+          <>
+            <button className="fab-btn" onClick={handleAddCabinet} title="添加柜机">
+              <Plus size={18} />
+            </button>
+            <button className="fab-btn fab-btn-primary" onClick={() => setShowBatchModal(true)} title="批量生成">
+              <Layers size={18} />
+            </button>
+          </>
         )}
       </div>
 
@@ -418,6 +444,15 @@ const MapPage: React.FC = () => {
 
       {/* 登录弹窗 */}
       <LoginModal visible={showLoginModal} onClose={() => setShowLoginModal(false)} />
+
+      {/* 批量生成弹窗 */}
+      {showBatchModal && (
+        <BatchModal
+          tags={tags}
+          onConfirm={handleBatchGenerate}
+          onClose={() => setShowBatchModal(false)}
+        />
+      )}
 
       <style>{`
         .main-content {
@@ -443,16 +478,44 @@ const MapPage: React.FC = () => {
         }
         .mobile-bottom-bar {
           position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
+          bottom: 24px;
+          right: 24px;
+          left: auto;
+          display: flex;
+          flex-direction: column-reverse;
+          align-items: center;
+          gap: 12px;
+          z-index: 60;
+        }
+        .fab-btn {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
           display: flex;
           align-items: center;
-          justify-content: space-around;
-          padding: 8px 16px;
+          justify-content: center;
           background: #fff;
-          border-top: 1px solid var(--color-border);
-          z-index: 60;
+          border: none;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+          color: var(--color-text-secondary);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .fab-btn:hover {
+          transform: scale(1.08);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+        .fab-btn:active {
+          transform: scale(0.95);
+        }
+        .fab-btn-primary {
+          background: var(--color-primary);
+          color: #fff;
+          box-shadow: 0 4px 14px rgba(59,130,246,0.4);
+        }
+        .fab-btn-primary:hover {
+          background: var(--color-primary-hover);
+          box-shadow: 0 6px 20px rgba(59,130,246,0.5);
         }
 
         @media (min-width: 768px) {

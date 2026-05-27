@@ -31,6 +31,8 @@ interface ToolbarProps {
   onSearchResult: (cabinetId: string) => void;
   /** 添加柜机回调 */
   onAddCabinet: () => void;
+  /** 批量生成柜机回调 */
+  onBatchGenerate: () => void;
   /** 添加区域回调 */
   onAddZone: () => void;
   /** 缩放回调 */
@@ -52,6 +54,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   dataVersion,
   onSearchResult,
   onAddCabinet,
+  onBatchGenerate,
   onAddZone,
   onZoomIn,
   onZoomOut,
@@ -171,6 +174,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <button className="btn btn-primary btn-sm desktop-only" onClick={onAddCabinet}>
             <Plus size={16} />
             <span className="btn-label">添加柜机</span>
+          </button>
+        )}
+        {/* 批量生成按钮（需登录） */}
+        {isAuthenticated && (
+          <button className="btn btn-ghost btn-sm desktop-only" onClick={onBatchGenerate}>
+            <Layers size={16} />
+            <span className="btn-label">批量生成</span>
           </button>
         )}
         {/* 添加区域按钮（需登录） */}

@@ -168,6 +168,9 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   // 柜机拖拽中标志（避免容器平移逻辑干扰柜机拖拽）
   const cabinetDraggingRef = useRef(false);
 
+  // 区域拖拽/调整中标志
+  const zoneDraggingRef = useRef(false);
+
   // 鼠标拖拽平移
   const mouseDragRef = useRef<{ isDown: boolean; startX: number; startY: number; stageX: number; stageY: number }>({
     isDown: false, startX: 0, startY: 0, stageX: 0, stageY: 0,
@@ -442,7 +445,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
       }}
       onMouseMove={(e: React.MouseEvent) => {
         if (!mouseDragRef.current.isDown) return;
-        if (cabinetDraggingRef.current) return;
+        if (cabinetDraggingRef.current || zoneDraggingRef.current) return;
         const dx = e.clientX - mouseDragRef.current.startX;
         const dy = e.clientY - mouseDragRef.current.startY;
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
@@ -558,9 +561,11 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   fill="transparent"
                   stroke="transparent"
                   draggable={isAuthenticated}
+                  onDragStart={() => { zoneDraggingRef.current = true; }}
                   onClick={() => { setSelectedZoneId(zone.id); onSelectCabinet(null); }}
                   onTap={() => { setSelectedZoneId(zone.id); onSelectCabinet(null); }}
                   onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
+                    zoneDraggingRef.current = false;
                     onZoneDragEnd(zone.id, e.target.x(), e.target.y());
                   }}
                 />
@@ -584,6 +589,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                         strokeWidth={1}
                         cornerRadius={2}
                         draggable
+                        onDragStart={() => { zoneDraggingRef.current = true; }}
                         onDragMove={(e: Konva.KonvaEventObject<DragEvent>) => {
                           const nx = e.target.x();
                           const ny = e.target.y();
@@ -596,6 +602,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                             onZoneResize(zone.id, newX, newY, newW, newH);
                           }
                         }}
+                        onDragEnd={() => { zoneDraggingRef.current = false; }}
                       />
                     ))}
                   </>

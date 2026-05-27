@@ -383,6 +383,123 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
 
 /**
  * @swagger
+ * /api/cabinets/batch:
+ *   post:
+ *     summary: 批量生成带标签柜机
+ *     description: 批量生成 N 个柜机，自动编号并挂载指定标签（需登录）
+ *     tags: [柜机管理]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [count, tagId]
+ *             properties:
+ *               count:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 50
+ *                 description: 生成数量
+ *               tagId:
+ *                 type: string
+ *                 description: 标签 ID
+ *     responses:
+ *       201:
+ *         description: 批量生成成功
+ *       400:
+ *         description: 参数错误
+ */
+router.post('/batch', authMiddleware, (req: Request, res: Response): void => {
+  const { count, tagId }: { count?: number; tagId?: string } = req.body;
+
+  if (!count || !Number.isInteger(count) || count < 1 || count > 50) {
+    res.status(400).json({ error: '数量必须为 1-50 的整数' });
+    return;
+  }
+
+  if (!tagId || !tagId.trim()) {
+    res.status(400).json({ error: '请指定标签' });
+    return;
+  }
+
+  const db = getDatabase();
+
+  // 验证标签存在
+  const tag = db.prepare('SELECT id, name FROM tags WHERE id = ?').get(tagId);
+  if (!tag) {
+    res.status(400).json({ error: '标签不存在' });
+    return;
+  }
+
+  // 获取当前最大编号
+  const maxRow = db.prepare("SELECT MAX(CAST(SUBSTR(number, 3) AS INTEGER)) AS maxNum FROM cabinets WHERE number LIKE 'C-%'").get() as { maxNum: number | null };
+  let nextNum = (maxRow.maxNum || 0) + 1;
+
+  const now: string = new Date().toISOString();
+  const tagArray = JSON.stringify([tagId]);
+  const createdCabinets: Array<Record<string, unknown>> = [];
+
+  // 批量插入
+  const insertStmt = db.prepare(
+    'INSERT INTO cabinets (id, name, number, x, y, width, height, tags, zoneId, color, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  );
+
+  const colors = [
+    '#dbeafe', '#fce7f3', '#dcfce7', '#fef3c7',
+    '#e0e7ff', '#fae8ff', '#d1fae5', '#fef9c3',
+    '#e0f2fe', '#ffe4e6', '#ccfbf1', '#ffedd5',
+  ];
+
+  // 计算排列位置：水平排列，每行10个自动换行
+  const CABINET_W = 180;
+  const CABINET_H = 50;
+  const GAP_X = 20;
+  const GAP_Y = 30;
+  const PER_ROW = 10;
+  const START_X = 100;
+  const START_Y = 200;
+
+  for (let i = 0; i < count; i++) {
+    const num = nextNum + i;
+    const row = Math.floor(i / PER_ROW);
+    const col = i % PER_ROW;
+
+    const cabinet = {
+      id: uuidv4(),
+      name: `${num}号柜`,
+      number: `C-${String(num).padStart(2, '0')}`,
+      x: START_X + col * (CABINET_W + GAP_X),
+      y: START_Y + row * (CABINET_H + GAP_Y),
+      width: CABINET_W,
+      height: CABINET_H,
+      tags: tagArray,
+      zoneId: null,
+      color: colors[i % colors.length],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    insertStmt.run(
+      cabinet.id, cabinet.name, cabinet.number, cabinet.x, cabinet.y,
+      cabinet.width, cabinet.height, cabinet.tags, cabinet.zoneId,
+      cabinet.color, cabinet.createdAt, cabinet.updatedAt
+    );
+
+    createdCabinets.push({ ...cabinet, tags: [tagId] });
+  }
+
+  incrementDataVersion();
+  addLog('add_cabinet', `批量生成 ${count} 个柜机，标签：${(tag as { name: string }).name}`, req.admin!.username);
+  createAutoSnapshot();
+
+  res.status(201).json(createdCabinets);
+});
+
+/**
+ * @swagger
  * /api/cabinets/{id}:
  *   put:
  *     summary: 更新柜机信息
