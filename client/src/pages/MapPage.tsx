@@ -17,6 +17,8 @@ import {
   deleteCabinet as apiDeleteCabinet,
   updateCabinetPosition,
   updateCabinetTags,
+  createZone,
+  updateZone,
 } from '../api';
 import Toolbar from '../components/Toolbar';
 import MapCanvas, { MapCanvasRef } from '../components/MapCanvas';
@@ -107,7 +109,7 @@ const MapPage: React.FC = () => {
     if (!isAuthenticated) return;
 
     const newNumber = generateNumber(cabinets);
-    const newName = `${newNumber}号柜`;
+    const newName = `${parseInt(newNumber.replace('C-', ''))}号柜`;
 
     // 获取当前视图中心对应的画布坐标
     const center = mapCanvasRef.current
@@ -172,6 +174,55 @@ const MapPage: React.FC = () => {
       throw err;
     }
   }, []);
+
+  /**
+   * 区域拖拽结束
+   */
+  const handleZoneDragEnd = useCallback(async (zoneId: string, x: number, y: number) => {
+    try {
+      await updateZone(zoneId, { x, y });
+      setZones((prev) => prev.map((z) => (z.id === zoneId ? { ...z, x, y } : z)));
+    } catch (err) {
+      console.error('更新区域位置失败:', err);
+    }
+  }, []);
+
+  /**
+   * 区域大小调整结束
+   */
+  const handleZoneResize = useCallback(async (zoneId: string, x: number, y: number, width: number, height: number) => {
+    try {
+      await updateZone(zoneId, { x, y, width, height });
+      setZones((prev) => prev.map((z) => (z.id === zoneId ? { ...z, x, y, width, height } : z)));
+    } catch (err) {
+      console.error('调整区域大小失败:', err);
+    }
+  }, []);
+
+  /**
+   * 添加新区域
+   */
+  const handleAddZone = useCallback(async () => {
+    if (!isAuthenticated) return;
+    const center = mapCanvasRef.current
+      ? mapCanvasRef.current.getCanvasCenter()
+      : { x: 800, y: 500 };
+    const zoneName = prompt('请输入区域名称（如 A区、B区）:', '新区域');
+    if (!zoneName) return;
+    try {
+      const newZone = await createZone({
+        name: zoneName,
+        color: randomColor(),
+        x: center.x - 150,
+        y: center.y - 100,
+        width: 300,
+        height: 200,
+      });
+      setZones((prev) => [...prev, newZone]);
+    } catch (err) {
+      console.error('添加区域失败:', err);
+    }
+  }, [isAuthenticated]);
 
   /**
    * 删除柜机
@@ -286,9 +337,11 @@ const MapPage: React.FC = () => {
       {/* 顶部导航栏 */}
       <Toolbar
         cabinets={cabinets}
+        tags={tags}
         dataVersion={systemMeta.dataVersion}
         onSearchResult={handleSearchResult}
         onAddCabinet={handleAddCabinet}
+        onAddZone={handleAddZone}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onResetView={handleResetView}
@@ -310,6 +363,8 @@ const MapPage: React.FC = () => {
           onCabinetDragEnd={handleCabinetDragEnd}
           addPosition={addPositionRef.current}
           onClickEmpty={handleClickEmpty}
+          onZoneDragEnd={handleZoneDragEnd}
+          onZoneResize={handleZoneResize}
         />
 
         {/* 右侧面板区域（桌面端） */}

@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import type { Cabinet } from '../types';
+import type { Cabinet, Tag } from '../types';
 import {
   Search,
   Plus,
@@ -17,17 +17,22 @@ import {
   LogOut,
   MapPin,
   Database,
+  Layers,
 } from 'lucide-react';
 
 interface ToolbarProps {
   /** 柜机列表，用于搜索 */
   cabinets: Cabinet[];
+  /** 标签列表，用于搜索结果显示品牌 */
+  tags: Tag[];
   /** 数据版本号 */
   dataVersion: number;
   /** 搜索跳转回调 */
   onSearchResult: (cabinetId: string) => void;
   /** 添加柜机回调 */
   onAddCabinet: () => void;
+  /** 添加区域回调 */
+  onAddZone: () => void;
   /** 缩放回调 */
   onZoomIn: () => void;
   /** 缩放回调 */
@@ -43,9 +48,11 @@ interface ToolbarProps {
  */
 const Toolbar: React.FC<ToolbarProps> = ({
   cabinets,
+  tags,
   dataVersion,
   onSearchResult,
   onAddCabinet,
+  onAddZone,
   onZoomIn,
   onZoomOut,
   onResetView,
@@ -142,8 +149,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   className="search-dropdown-item"
                   onClick={() => handleSelectResult(cabinet)}
                 >
-                  <span className="search-dropdown-number">{cabinet.number}</span>
-                  <span className="search-dropdown-name">{cabinet.name}</span>
+                  <span className="search-dropdown-number">
+                    {(() => {
+                      const brandTag = tags.find((t) => (cabinet.tags || []).includes(t.id) && t.category === 'brand');
+                      return brandTag ? `${brandTag.name}${cabinet.name}` : cabinet.name;
+                    })()}
+                  </span>
                 </div>
               ))
             ) : (
@@ -160,6 +171,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <button className="btn btn-primary btn-sm desktop-only" onClick={onAddCabinet}>
             <Plus size={16} />
             <span className="btn-label">添加柜机</span>
+          </button>
+        )}
+        {/* 添加区域按钮（需登录） */}
+        {isAuthenticated && (
+          <button className="btn btn-ghost btn-sm desktop-only" onClick={onAddZone}>
+            <Layers size={16} />
+            <span className="btn-label">添加区域</span>
           </button>
         )}
 

@@ -115,6 +115,7 @@ const AdminPage: React.FC = () => {
   // 添加标签
   const [newTagName, setNewTagName] = useState<string>('');
   const [newTagColor, setNewTagColor] = useState<string>('#3b82f6');
+  const [newTagCategory, setNewTagCategory] = useState<string>('custom');
 
   // 添加区域
   const [showAddZone, setShowAddZone] = useState<boolean>(false);
@@ -241,7 +242,7 @@ const AdminPage: React.FC = () => {
     try {
       await createTag({
         name: newTagName.trim(),
-        category: 'custom',
+        category: newTagCategory,
         color: newTagColor,
       });
       setNewTagName('');
@@ -563,6 +564,15 @@ const AdminPage: React.FC = () => {
                 onChange={(e) => setNewTagColor(e.target.value)}
                 className="color-picker"
               />
+              <select
+                value={newTagCategory}
+                onChange={(e) => setNewTagCategory(e.target.value)}
+                className="tag-category-select"
+              >
+                <option value="custom">自定义</option>
+                <option value="courier">快递公司</option>
+                <option value="brand">柜机品牌</option>
+              </select>
               <button className="btn btn-primary btn-sm" onClick={handleAddTag}>
                 <Plus size={14} /> 添加
               </button>
@@ -955,6 +965,13 @@ const AdminPage: React.FC = () => {
           border: 1px solid var(--color-border);
           border-radius: var(--radius-sm);
           cursor: pointer;
+        }
+        .tag-category-select {
+          padding: 6px 8px;
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-sm);
+          font-size: 13px;
+          background: #fff;
         }
         .tag-list {
           max-height: 300px;

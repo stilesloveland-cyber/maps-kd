@@ -246,16 +246,33 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
             </button>
             {showTagPicker && (
               <div className="detail-tag-picker">
-                {availableTags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    className="detail-tag-option"
-                    style={{ borderColor: tag.color }}
-                    onClick={() => handleToggleTag(tag.id)}
-                  >
-                    {tag.name}
-                  </button>
-                ))}
+                {/* 按分类分组显示 */}
+                {['courier', 'brand', 'custom'].map((category) => {
+                  const categoryTags = availableTags.filter((t) => t.category === category);
+                  if (categoryTags.length === 0) return null;
+                  const categoryNames: Record<string, string> = {
+                    courier: '📦 快递公司',
+                    brand: '🏪 柜机品牌',
+                    custom: '🏷️ 自定义',
+                  };
+                  return (
+                    <div key={category} className="tag-group">
+                      <div className="tag-group-title">{categoryNames[category]}</div>
+                      <div className="tag-group-tags">
+                        {categoryTags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            className="detail-tag-option"
+                            style={{ borderColor: tag.color }}
+                            onClick={() => handleToggleTag(tag.id)}
+                          >
+                            {tag.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -422,9 +439,20 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         }
         .detail-tag-picker {
           display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-top: 8px;
+        }
+        .tag-group-title {
+          font-size: 11px;
+          font-weight: 600;
+          color: #64748b;
+          margin-bottom: 2px;
+        }
+        .tag-group-tags {
+          display: flex;
           flex-wrap: wrap;
           gap: 4px;
-          margin-top: 8px;
         }
         .detail-tag-option {
           padding: 4px 10px;

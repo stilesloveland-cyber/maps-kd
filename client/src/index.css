@@ -5,6 +5,7 @@
 
 /* ---------- CSS 变量定义 ---------- */
 :root {
+  color-scheme: light;
   --color-primary: #3b82f6;
   --color-primary-hover: #2563eb;
   --color-primary-light: #dbeafe;

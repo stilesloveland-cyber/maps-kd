@@ -77,6 +77,10 @@ interface MapCanvasProps {
   addPosition: { x: number; y: number } | null;
   /** 点击空白区域回调 */
   onClickEmpty: () => void;
+  /** 区域拖拽结束回调 */
+  onZoneDragEnd: (zoneId: string, x: number, y: number) => void;
+  /** 区域大小调整结束回调 */
+  onZoneResize: (zoneId: string, x: number, y: number, width: number, height: number) => void;
 }
 
 // ---------- 辅助函数 ----------
@@ -126,6 +130,8 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   onCabinetDragEnd,
   addPosition,
   onClickEmpty,
+  onZoneDragEnd,
+  onZoneResize,
 }, ref) => {
   const { isAuthenticated } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -146,11 +152,23 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   /** 拖拽后的柜机位置缓存（避免重绘闪烁） */
   const draggedPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
+  /** 当前选中的区域 ID（用于调整大小） */
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+
   // 触屏双指缩放的初始距离记录
   const lastTouchDistRef = useRef<number | null>(null);
 
   // 是否正在拖拽视图（区分拖拽和点击）
   const isDraggingRef = useRef(false);
+
+  // 触屏单指拖动起始位置
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const touchStagePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // 鼠标拖拽平移
+  const mouseDragRef = useRef<{ isDown: boolean; startX: number; startY: number; stageX: number; stageY: number }>({
+    isDown: false, startX: 0, startY: 0, stageX: 0, stageY: 0,
+  });
 
   /** 驿站入口位置（底部中间） */
   const entryX = DEFAULT_WIDTH / 2;
@@ -277,12 +295,71 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   }, [stageConfig]);
 
   /**
-   * 触屏事件处理 - 单指拖动 + 双指缩放
+   * 鼠标按下 - 开始拖拽平移视图
+   */
+  const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // 只在空白区域拖拽，不选中柜机时
+    mouseDragRef.current = {
+      isDown: true,
+      startX: e.evt.clientX,
+      startY: e.evt.clientY,
+      stageX: stageConfig.x,
+      stageY: stageConfig.y,
+    };
+  }, [stageConfig]);
+
+  /**
+   * 鼠标移动 - 拖拽平移视图
+   */
+  const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!mouseDragRef.current.isDown) return;
+    const dx = e.evt.clientX - mouseDragRef.current.startX;
+    const dy = e.evt.clientY - mouseDragRef.current.startY;
+    setStageConfig({
+      ...stageConfig,
+      x: mouseDragRef.current.stageX + dx,
+      y: mouseDragRef.current.stageY + dy,
+    });
+  }, [stageConfig]);
+
+  /**
+   * 鼠标释放 - 结束拖拽
+   */
+  const handleMouseUp = useCallback(() => {
+    mouseDragRef.current.isDown = false;
+  }, []);
+
+  /**
+   * 触屏事件 - 开始触摸
+   */
+  const handleTouchStart = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
+    const touchCount = e.evt.touches.length;
+    if (touchCount === 1) {
+      // 单指拖动：记录起始位置
+      touchStartPosRef.current = {
+        x: e.evt.touches[0].clientX,
+        y: e.evt.touches[0].clientY,
+      };
+      touchStagePosRef.current = { x: stageConfig.x, y: stageConfig.y };
+    }
+  }, [stageConfig]);
+
+  /**
+   * 触屏事件 - 移动（单指拖动 + 双指缩放）
    */
   const handleTouchMove = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     const touchCount = e.evt.touches.length;
 
-    if (touchCount === 2) {
+    if (touchCount === 1 && touchStartPosRef.current) {
+      // 单指拖动：根据手指移动偏移量平移视图
+      const dx = e.evt.touches[0].clientX - touchStartPosRef.current.x;
+      const dy = e.evt.touches[0].clientY - touchStartPosRef.current.y;
+      setStageConfig({
+        ...stageConfig,
+        x: touchStagePosRef.current.x + dx,
+        y: touchStagePosRef.current.y + dy,
+      });
+    } else if (touchCount === 2) {
       // 双指缩放
       e.evt.preventDefault();
       const touch1 = e.evt.touches[0];
@@ -291,20 +368,17 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
         (touch2.clientX - touch1.clientX) ** 2 +
           (touch2.clientY - touch1.clientY) ** 2,
       );
+      // 双指中心点
+      const centerX = (touch1.clientX + touch2.clientX) / 2;
+      const centerY = (touch1.clientY + touch2.clientY) / 2;
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
 
       if (lastTouchDistRef.current !== null) {
         const scaleBy = dist / lastTouchDistRef.current;
-        const stage = stageRef.current;
-        if (!stage) return;
-
         const oldScale = stageConfig.scale;
         const newScale = oldScale * scaleBy;
         const clampedScale = Math.max(0.2, Math.min(3, newScale));
-
-        const centerX = (touch1.clientX + touch2.clientX) / 2;
-        const centerY = (touch1.clientY + touch2.clientY) / 2;
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
 
         const pointerX = centerX - rect.left;
         const pointerY = centerY - rect.top;
@@ -329,34 +403,12 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
    */
   const handleTouchEnd = useCallback(() => {
     lastTouchDistRef.current = null;
+    touchStartPosRef.current = null;
   }, []);
 
   /**
-   * 拖拽开始/结束标记
+   * 判断柜机是否匹配筛选标签
    */
-  const handleDragStart = useCallback(() => {
-    isDraggingRef.current = true;
-  }, []);
-
-  const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-    // 延迟重置，让 click 事件可以判断是否发生了拖拽
-    setTimeout(() => {
-      isDraggingRef.current = false;
-    }, 50);
-  }, []);
-
-  /**
-   * 点击空白区域（点击 Stage 背景）
-   */
-  const handleStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    // 如果点击的是柜机或其他子元素，不处理
-    if (e.target !== e.target.getStage()) return;
-    if (isDraggingRef.current) return;
-    onSelectCabinet(null);
-    onClickEmpty();
-  }, [onSelectCabinet, onClickEmpty]);
-
-  // 判断柜机是否匹配筛选标签
   const isCabinetFilterMatch = useCallback(
     (cabinet: Cabinet): boolean => {
       if (filterTagIds.length === 0) return true;
@@ -372,7 +424,36 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   const gridLines = generateGridLines(DEFAULT_WIDTH, DEFAULT_HEIGHT);
 
   return (
-    <div className="canvas-container" ref={containerRef}>
+    <div
+      className="canvas-container"
+      ref={containerRef}
+      onMouseDown={(e) => {
+        // 统一在容器上捕获 mousedown，确保选中柜机后也能拖动地图
+        mouseDragRef.current = {
+          isDown: true,
+          startX: e.clientX,
+          startY: e.clientY,
+          stageX: stageConfig.x,
+          stageY: stageConfig.y,
+        };
+      }}
+      onMouseMove={(e) => {
+        if (!mouseDragRef.current.isDown) return;
+        const dx = e.clientX - mouseDragRef.current.startX;
+        const dy = e.clientY - mouseDragRef.current.startY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+          // 拖动超过3px认为是拖拽动作，取消柜机选中
+          if (selectedCabinetId) onSelectCabinet(null);
+        }
+        setStageConfig({
+          ...stageConfig,
+          x: mouseDragRef.current.stageX + dx,
+          y: mouseDragRef.current.stageY + dy,
+        });
+      }}
+      onMouseUp={() => { mouseDragRef.current.isDown = false; }}
+      onMouseLeave={() => { mouseDragRef.current.isDown = false; }}
+    >
       <Stage
         ref={stageRef}
         width={containerSize.width}
@@ -381,22 +462,22 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
         y={stageConfig.y}
         scaleX={stageConfig.scale}
         scaleY={stageConfig.scale}
-        draggable={!selectedCabinetId} // 没有选中柜机时可拖拽视图
-        onDragStart={handleDragStart}
-        onDragEnd={(e) => {
-          // 更新平移位置
-          setStageConfig((prev) => ({
-            ...prev,
-            x: e.target.x(),
-            y: e.target.y(),
-          }));
-          handleDragEnd(e);
-        }}
+        draggable={false}
         onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onClick={handleStageClick}
-        onTap={handleStageClick}
+        onContentClick={(e) => {
+          // 点击画布空白区域取消选中
+          if (!mouseDragRef.current.isDown) {
+            onSelectCabinet(null);
+            onClickEmpty();
+          }
+        }}
       >
         {/* 网格背景层 */}
         <Layer>
@@ -421,49 +502,103 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
 
         {/* 区域层 */}
         <Layer>
-          {zones.map((zone) => (
-            <Group key={zone.id}>
-              {/* 区域底色（半透明） */}
-              <Rect
-                x={zone.x}
-                y={zone.y}
-                width={zone.width}
-                height={zone.height}
-                fill={zone.color + '15'}
-                cornerRadius={4}
-              />
-              {/* 区域虚线边框 */}
-              <Rect
-                x={zone.x}
-                y={zone.y}
-                width={zone.width}
-                height={zone.height}
-                stroke={zone.color}
-                strokeWidth={2}
-                dash={[10, 5]}
-                cornerRadius={4}
-              />
-              {/* 区域名称标签 */}
-              <Group>
+          {zones.map((zone) => {
+            const isZoneSelected = zone.id === selectedZoneId;
+            return (
+              <Group key={zone.id}>
+                {/* 区域底色 */}
                 <Rect
-                  x={zone.x + 8}
-                  y={zone.y + 8}
-                  width={zone.name.length * 14 + 16}
-                  height={28}
-                  fill={zone.color + '30'}
+                  x={zone.x}
+                  y={zone.y}
+                  width={zone.width}
+                  height={zone.height}
+                  fill={zone.color + '15'}
                   cornerRadius={4}
                 />
-                <Text
-                  x={zone.x + 16}
-                  y={zone.y + 14}
-                  text={zone.name}
-                  fontSize={13}
-                  fontStyle="bold"
-                  fill={zone.color}
+                {/* 区域虚线边框 */}
+                <Rect
+                  x={zone.x}
+                  y={zone.y}
+                  width={zone.width}
+                  height={zone.height}
+                  stroke={isZoneSelected ? '#3b82f6' : zone.color}
+                  strokeWidth={isZoneSelected ? 3 : 2}
+                  dash={[10, 5]}
+                  cornerRadius={4}
                 />
+                {/* 区域名称标签 */}
+                <Group>
+                  <Rect
+                    x={zone.x + 8}
+                    y={zone.y + 8}
+                    width={zone.name.length * 14 + 16}
+                    height={28}
+                    fill={isZoneSelected ? '#3b82f6' : zone.color + '30'}
+                    cornerRadius={4}
+                  />
+                  <Text
+                    x={zone.x + 16}
+                    y={zone.y + 14}
+                    text={zone.name}
+                    fontSize={13}
+                    fontStyle="bold"
+                    fill={isZoneSelected ? '#fff' : zone.color}
+                  />
+                </Group>
+                {/* 可拖动区域（透明点击区，不遮挡文字） */}
+                <Rect
+                  x={zone.x}
+                  y={zone.y}
+                  width={zone.width}
+                  height={zone.height}
+                  fill="transparent"
+                  stroke="transparent"
+                  draggable={isAuthenticated}
+                  onClick={() => { setSelectedZoneId(zone.id); onSelectCabinet(null); }}
+                  onTap={() => { setSelectedZoneId(zone.id); onSelectCabinet(null); }}
+                  onDragEnd={(e) => {
+                    onZoneDragEnd(zone.id, e.target.x(), e.target.y());
+                  }}
+                />
+                {/* 选中时显示四角调整手柄 */}
+                {isZoneSelected && isAuthenticated && (
+                  <>
+                    {[
+                      { x: zone.x - 5, y: zone.y - 5, cursor: 'nw-resize' },
+                      { x: zone.x + zone.width - 5, y: zone.y - 5, cursor: 'ne-resize' },
+                      { x: zone.x - 5, y: zone.y + zone.height - 5, cursor: 'sw-resize' },
+                      { x: zone.x + zone.width - 5, y: zone.y + zone.height - 5, cursor: 'se-resize' },
+                    ].map((handle, i) => (
+                      <Rect
+                        key={i}
+                        x={handle.x}
+                        y={handle.y}
+                        width={10}
+                        height={10}
+                        fill="#3b82f6"
+                        stroke="#fff"
+                        strokeWidth={1}
+                        cornerRadius={2}
+                        draggable
+                        onDragMove={(e) => {
+                          const nx = e.target.x();
+                          const ny = e.target.y();
+                          let newX = zone.x, newY = zone.y, newW = zone.width, newH = zone.height;
+                          if (i === 0) { newX = nx + 5; newY = ny + 5; newW = zone.x + zone.width - newX; newH = zone.y + zone.height - newY; }
+                          else if (i === 1) { newY = ny + 5; newW = nx - zone.x + 5; newH = zone.y + zone.height - newY; }
+                          else if (i === 2) { newX = nx + 5; newW = zone.x + zone.width - newX; newH = ny - zone.y + 5; }
+                          else if (i === 3) { newW = nx - zone.x + 5; newH = ny - zone.y + 5; }
+                          if (newW > 50 && newH > 50) {
+                            onZoneResize(zone.id, newX, newY, newW, newH);
+                          }
+                        }}
+                      />
+                    ))}
+                  </>
+                )}
               </Group>
-            </Group>
-          ))}
+            );
+          })}
         </Layer>
 
         {/* 柜机层 */}
@@ -644,7 +779,9 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
           flex: 1;
           overflow: hidden;
           position: relative;
-          background: #fafafa;
+          background: #f8fafc;
+          cursor: grab;
+        }  background: #fafafa;
           cursor: grab;
         }
         .canvas-container:active {
