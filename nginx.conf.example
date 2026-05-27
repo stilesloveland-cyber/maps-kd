@@ -1,0 +1,69 @@
+# =============================================
+# Nginx 反向代理配置示例
+# 使用方式：
+#   1. 将本文件复制到 /etc/nginx/sites-available/
+#   2. 修改 server_name 为你的域名
+#   3. 配置 SSL 证书路径
+#   4. 创建软链到 sites-enabled
+#   5. nginx -t && systemctl reload nginx
+# =============================================
+
+# ---- HTTP → HTTPS 强制跳转 ----
+server {
+    listen 80;
+    server_name kuaidi.example.com;  # ← 改成你的域名
+
+    # Cloudflare 模式：如果使用 Cloudflare Flexible SSL，保留此段即可
+    # 非 Cloudflare 模式：开启下方 SSL 跳转
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ---- HTTPS 服务 ----
+server {
+    listen 443 ssl http2;
+    server_name kuaidi.example.com;  # ← 改成你的域名
+
+    # SSL 证书（使用 Let's Encrypt 或自行申请）
+    ssl_certificate     /path/to/your/cert.pem;      # ← 改成证书路径
+    ssl_certificate_key /path/to/your/key.pem;        # ← 改成密钥路径
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # 反向代理到 Docker 容器
+    location / {
+        proxy_pass http://localhost:3000;  # ← 改成你的宿主机映射端口
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # WebSocket 支持（如需实时功能可保留）
+    location /ws {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+
+# ---- Cloudflare 模式（仅 HTTP，Cloudflare 负责 HTTPS）----
+# 如使用 Cloudflare Flexible SSL，取消下方注释并注释上方 HTTPS 段
+# server {
+#     listen 80;
+#     server_name kuaidi.example.com;
+#
+#     location / {
+#         proxy_pass http://localhost:3000;
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     }
+# }

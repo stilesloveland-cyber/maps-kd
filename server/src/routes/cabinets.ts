@@ -3,12 +3,14 @@
  * 处理柜机的完整 CRUD、位置更新、标签更新、Excel 导入导出和模板下载
  * 每次修改操作自动递增数据版本号并记录操作日志
  * 每次添加/删除自动创建备份快照
+ *
+ * 注意：静态路径（/export, /import, /template）必须在 /:id 通配路由之前注册，
+ *       否则 Express 会将 'export' 解析为 id 参数
  */
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
-import path from 'path';
 import { getDatabase, incrementDataVersion, addLog } from '../db';
 import { authMiddleware } from '../middleware/auth';
 
@@ -33,6 +35,240 @@ function createAutoSnapshot(): void {
     'INSERT INTO backups (id, version, type, snapshot, createdAt) VALUES (?, ?, ?, ?, ?)'
   ).run(uuidv4(), maxVersion.maxVer + 1, 'auto', JSON.stringify(cabinets), now);
 }
+
+// ====================================================================
+// 静态路径路由（必须在 /:id 之前注册）
+// ====================================================================
+
+/**
+ * @swagger
+ * /api/cabinets/export:
+ *   get:
+ *     summary: 导出柜机数据为 .xlsx 文件
+ *     description: 将所有柜机数据导出为 Excel 文件（需登录）
+ *     tags: [柜机管理]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Excel 文件
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
+router.get('/export', authMiddleware, (_req: Request, res: Response): void => {
+  const db = getDatabase();
+  const cabinets = db.prepare('SELECT * FROM cabinets ORDER BY number ASC').all() as Array<{
+    number: string; name: string; x: number; y: number;
+    width: number; height: number; color: string; zoneId: string | null; tags: string;
+  }>;
+
+  // 构建导出数据
+  const exportData = cabinets.map((cab) => ({
+    编号: cab.number,
+    名称: cab.name,
+    X坐标: cab.x,
+    Y坐标: cab.y,
+    宽度: cab.width,
+    高度: cab.height,
+    颜色: cab.color,
+    区域: cab.zoneId || '',
+    标签: cab.tags,
+  }));
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  XLSX.utils.book_append_sheet(workbook, worksheet, '柜机数据');
+
+  const buffer: Buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+  addLog('export_cabinets', `导出了 ${cabinets.length} 个柜机的数据到 Excel`, req.admin!.username);
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=cabinets_export_${Date.now()}.xlsx`);
+  res.send(buffer);
+});
+
+/**
+ * @swagger
+ * /api/cabinets/import:
+ *   post:
+ *     summary: 从 .xlsx 文件批量导入柜机
+ *     description: 上传 Excel 文件批量导入柜机（需登录），自动跳过编号重复的柜机
+ *     tags: [柜机管理]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: 导入结果
+ */
+router.post('/import', authMiddleware, upload.single('file'), (req: Request, res: Response): void => {
+  if (!req.file) {
+    res.status(400).json({ error: '请上传 .xlsx 文件' });
+    return;
+  }
+
+  const db = getDatabase();
+  const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+  const sheetName: string = workbook.SheetNames[0];
+  const rows: Array<Record<string, unknown>> = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+  if (rows.length === 0) {
+    res.status(400).json({ error: 'Excel 文件为空' });
+    return;
+  }
+
+  const now: string = new Date().toISOString();
+  let successCount: number = 0;
+  let failCount: number = 0;
+  const failReasons: Array<{ row: number; reason: string }> = [];
+
+  // 收集已有的柜机编号用于去重
+  const existingNumbers = new Set<string>(
+    (db.prepare('SELECT number FROM cabinets').all() as Array<{ number: string }>).map((r) => r.number)
+  );
+
+  const insertTransaction = db.transaction(() => {
+    for (let i: number = 0; i < rows.length; i++) {
+      const row: Record<string, unknown> = rows[i];
+      const number: string = String(row['编号'] || '').trim();
+      const name: string = String(row['名称'] || '').trim();
+
+      if (!number || !name) {
+        failCount++;
+        failReasons.push({ row: i + 2, reason: '编号或名称为空' });
+        continue;
+      }
+
+      if (existingNumbers.has(number)) {
+        failCount++;
+        failReasons.push({ row: i + 2, reason: `编号 "${number}" 已存在` });
+        continue;
+      }
+
+      const x: number = parseFloat(String(row['X坐标'])) || 0;
+      const y: number = parseFloat(String(row['Y坐标'])) || 0;
+      const width: number = parseFloat(String(row['宽度'])) || 200;
+      const height: number = parseFloat(String(row['高度'])) || 60;
+      const color: string = String(row['颜色'] || '#4A90D9');
+      const zoneId: string | null = String(row['区域'] || '').trim() || null;
+      let tags: string = '[]';
+      try {
+        const rawTags: string = String(row['标签'] || '[]');
+        tags = JSON.stringify(JSON.parse(rawTags));
+      } catch {
+        tags = '[]';
+      }
+
+      db.prepare(
+        'INSERT INTO cabinets (id, name, number, x, y, width, height, tags, zoneId, color, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(uuidv4(), name, number, x, y, width, height, tags, zoneId, color, now, now);
+
+      existingNumbers.add(number);
+      successCount++;
+    }
+  });
+
+  insertTransaction();
+
+  if (successCount > 0) {
+    incrementDataVersion();
+    addLog('import_cabinets', `从 Excel 导入了 ${successCount} 个柜机${failCount > 0 ? `，${failCount} 个跳过` : ''}`, req.admin!.username);
+    createAutoSnapshot();
+  }
+
+  res.json({
+    success: true,
+    total: rows.length,
+    successCount,
+    failCount,
+    failReasons,
+    message: `成功导入 ${successCount} 个柜机${failCount > 0 ? `，${failCount} 个跳过` : ''}`,
+  });
+});
+
+/**
+ * @swagger
+ * /api/cabinets/template:
+ *   get:
+ *     summary: 下载导入模板
+ *     description: 下载柜机导入模板 .xlsx 文件（公开接口）
+ *     tags: [柜机管理]
+ *     responses:
+ *       200:
+ *         description: 模板文件
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
+router.get('/template', (_req: Request, res: Response): void => {
+  const templateData = [
+    {
+      编号: 'C-01',
+      名称: '示例柜机A',
+      X坐标: 100,
+      Y坐标: 200,
+      宽度: 200,
+      高度: 60,
+      颜色: '#4A90D9',
+      区域: '',
+      标签: '[]',
+    },
+    {
+      编号: 'C-02',
+      名称: '示例柜机B',
+      X坐标: 400,
+      Y坐标: 200,
+      宽度: 200,
+      高度: 60,
+      颜色: '#E02020',
+      区域: '',
+      标签: '[]',
+    },
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(templateData);
+
+  // 设置列宽
+  worksheet['!cols'] = [
+    { wch: 10 }, // 编号
+    { wch: 20 }, // 名称
+    { wch: 10 }, // X坐标
+    { wch: 10 }, // Y坐标
+    { wch: 8 },  // 宽度
+    { wch: 8 },  // 高度
+    { wch: 12 }, // 颜色
+    { wch: 10 }, // 区域
+    { wch: 20 }, // 标签
+  ];
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, '导入模板');
+
+  const buffer: Buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=import_template.xlsx');
+  res.send(buffer);
+});
+
+// ====================================================================
+// 通用 CRUD 路由（含参数化路径）
+// ====================================================================
 
 /**
  * @swagger
@@ -386,232 +622,6 @@ router.put('/:id/tags', authMiddleware, (req: Request, res: Response): void => {
     ...result,
     tags: typeof result.tags === 'string' ? JSON.parse(result.tags as string) : result.tags,
   });
-});
-
-/**
- * @swagger
- * /api/cabinets/export:
- *   get:
- *     summary: 导出柜机数据为 .xlsx 文件
- *     description: 将所有柜机数据导出为 Excel 文件（需登录）
- *     tags: [柜机管理]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Excel 文件
- *         content:
- *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
- *             schema:
- *               type: string
- *               format: binary
- */
-router.get('/export', authMiddleware, (_req: Request, res: Response): void => {
-  const db = getDatabase();
-  const cabinets = db.prepare('SELECT * FROM cabinets ORDER BY number ASC').all() as Array<{
-    number: string; name: string; x: number; y: number;
-    width: number; height: number; color: string; zoneId: string | null; tags: string;
-  }>;
-
-  // 构建导出数据
-  const exportData = cabinets.map((cab) => ({
-    编号: cab.number,
-    名称: cab.name,
-    X坐标: cab.x,
-    Y坐标: cab.y,
-    宽度: cab.width,
-    高度: cab.height,
-    颜色: cab.color,
-    区域: cab.zoneId || '',
-    标签: cab.tags,
-  }));
-
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(exportData);
-  XLSX.utils.book_append_sheet(workbook, worksheet, '柜机数据');
-
-  const buffer: Buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-  addLog('export_cabinets', `导出了 ${cabinets.length} 个柜机的数据到 Excel`, req.admin!.username);
-
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename=cabinets_export_${Date.now()}.xlsx`);
-  res.send(buffer);
-});
-
-/**
- * @swagger
- * /api/cabinets/import:
- *   post:
- *     summary: 从 .xlsx 文件批量导入柜机
- *     description: 上传 Excel 文件批量导入柜机（需登录），自动跳过编号重复的柜机
- *     tags: [柜机管理]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: 导入结果
- */
-router.post('/import', authMiddleware, upload.single('file'), (req: Request, res: Response): void => {
-  if (!req.file) {
-    res.status(400).json({ error: '请上传 .xlsx 文件' });
-    return;
-  }
-
-  const db = getDatabase();
-  const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-  const sheetName: string = workbook.SheetNames[0];
-  const rows: Array<Record<string, unknown>> = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-
-  if (rows.length === 0) {
-    res.status(400).json({ error: 'Excel 文件为空' });
-    return;
-  }
-
-  const now: string = new Date().toISOString();
-  let successCount: number = 0;
-  let failCount: number = 0;
-  const failReasons: Array<{ row: number; reason: string }> = [];
-
-  // 收集已有的柜机编号用于去重
-  const existingNumbers = new Set<string>(
-    (db.prepare('SELECT number FROM cabinets').all() as Array<{ number: string }>).map((r) => r.number)
-  );
-
-  const insertTransaction = db.transaction(() => {
-    for (let i: number = 0; i < rows.length; i++) {
-      const row: Record<string, unknown> = rows[i];
-      const number: string = String(row['编号'] || '').trim();
-      const name: string = String(row['名称'] || '').trim();
-
-      if (!number || !name) {
-        failCount++;
-        failReasons.push({ row: i + 2, reason: '编号或名称为空' });
-        continue;
-      }
-
-      if (existingNumbers.has(number)) {
-        failCount++;
-        failReasons.push({ row: i + 2, reason: `编号 "${number}" 已存在` });
-        continue;
-      }
-
-      const x: number = parseFloat(String(row['X坐标'])) || 0;
-      const y: number = parseFloat(String(row['Y坐标'])) || 0;
-      const width: number = parseFloat(String(row['宽度'])) || 200;
-      const height: number = parseFloat(String(row['高度'])) || 60;
-      const color: string = String(row['颜色'] || '#4A90D9');
-      const zoneId: string | null = String(row['区域'] || '').trim() || null;
-      let tags: string = '[]';
-      try {
-        const rawTags: string = String(row['标签'] || '[]');
-        tags = JSON.stringify(JSON.parse(rawTags));
-      } catch {
-        tags = '[]';
-      }
-
-      db.prepare(
-        'INSERT INTO cabinets (id, name, number, x, y, width, height, tags, zoneId, color, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(uuidv4(), name, number, x, y, width, height, tags, zoneId, color, now, now);
-
-      existingNumbers.add(number);
-      successCount++;
-    }
-  });
-
-  insertTransaction();
-
-  if (successCount > 0) {
-    incrementDataVersion();
-    addLog('import_cabinets', `从 Excel 导入了 ${successCount} 个柜机${failCount > 0 ? `，${failCount} 个跳过` : ''}`, req.admin!.username);
-    createAutoSnapshot();
-  }
-
-  res.json({
-    success: true,
-    total: rows.length,
-    successCount,
-    failCount,
-    failReasons,
-    message: `成功导入 ${successCount} 个柜机${failCount > 0 ? `，${failCount} 个跳过` : ''}`,
-  });
-});
-
-/**
- * @swagger
- * /api/cabinets/template:
- *   get:
- *     summary: 下载导入模板
- *     description: 下载柜机导入模板 .xlsx 文件（公开接口）
- *     tags: [柜机管理]
- *     responses:
- *       200:
- *         description: 模板文件
- *         content:
- *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
- *             schema:
- *               type: string
- *               format: binary
- */
-router.get('/template', (_req: Request, res: Response): void => {
-  const templateData = [
-    {
-      编号: 'C-01',
-      名称: '示例柜机A',
-      X坐标: 100,
-      Y坐标: 200,
-      宽度: 200,
-      高度: 60,
-      颜色: '#4A90D9',
-      区域: '',
-      标签: '[]',
-    },
-    {
-      编号: 'C-02',
-      名称: '示例柜机B',
-      X坐标: 400,
-      Y坐标: 200,
-      宽度: 200,
-      高度: 60,
-      颜色: '#E02020',
-      区域: '',
-      标签: '[]',
-    },
-  ];
-
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(templateData);
-
-  // 设置列宽
-  worksheet['!cols'] = [
-    { wch: 10 }, // 编号
-    { wch: 20 }, // 名称
-    { wch: 10 }, // X坐标
-    { wch: 10 }, // Y坐标
-    { wch: 8 },  // 宽度
-    { wch: 8 },  // 高度
-    { wch: 12 }, // 颜色
-    { wch: 10 }, // 区域
-    { wch: 20 }, // 标签
-  ];
-
-  XLSX.utils.book_append_sheet(workbook, worksheet, '导入模板');
-
-  const buffer: Buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename=import_template.xlsx');
-  res.send(buffer);
 });
 
 export default router;
