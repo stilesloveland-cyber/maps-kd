@@ -4,17 +4,19 @@
  */
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { ToastProvider } from './context/ToastContext';
 import MapPage from './pages/MapPage';
 import AdminPage from './pages/AdminPage';
 
 const App: React.FC = () => {
   return (
-    <Routes>
-      <Route path="/" element={<MapPage />} />
-      <Route path="/admin" element={<AdminPage />} />
-      {/* 所有未匹配路由重定向到首页 */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <ToastProvider>
+      <Routes>
+        <Route path="/" element={<MapPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ToastProvider>
   );
 };
 

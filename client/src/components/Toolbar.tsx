@@ -5,6 +5,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useDebounce } from '../hooks/useDebounce';
 import type { Cabinet, Tag } from '../types';
 import {
   Search,
@@ -67,29 +68,37 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const [searchResults, setSearchResults] = useState<Cabinet[]>([]);
   const [showResults, setShowResults] = useState<boolean>(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const debouncedQuery = useDebounce(searchQuery, 200);
 
   /**
-   * 搜索逻辑：按编号或名称模糊匹配
+   * 搜索逻辑：按编号或名称模糊匹配（带200ms防抖）
    */
   const handleSearch = useCallback(
     (value: string) => {
       setSearchQuery(value);
       if (value.trim()) {
-        const query = value.toLowerCase();
-        const results = cabinets.filter(
-          (c) =>
-            c.number.toLowerCase().includes(query) ||
-            c.name.toLowerCase().includes(query),
-        );
-        setSearchResults(results);
         setShowResults(true);
       } else {
         setSearchResults([]);
         setShowResults(false);
       }
     },
-    [cabinets],
+    [],
   );
+
+  useEffect(() => {
+    if (debouncedQuery.trim()) {
+      const query = debouncedQuery.toLowerCase();
+      const results = cabinets.filter(
+        (c) =>
+          c.number.toLowerCase().includes(query) ||
+          c.name.toLowerCase().includes(query),
+      );
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [debouncedQuery, cabinets]);
 
   /**
    * 点击搜索结果，跳转到对应柜机位置

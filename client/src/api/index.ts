@@ -123,6 +123,20 @@ export const batchGenerateCabinets = (data: BatchGenerateRequest): Promise<Cabin
     body: JSON.stringify(data),
   });
 
+/** 批量删除柜机（需登录） */
+export const batchDeleteCabinets = (ids: string[]): Promise<{ success: boolean; deleted: number; message: string }> =>
+  request<{ success: boolean; deleted: number; message: string }>('/api/cabinets/batch-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+
+/** 批量移动柜机到区域（需登录） */
+export const batchMoveCabinets = (ids: string[], zoneId: string | null): Promise<{ success: boolean; moved: number; message: string }> =>
+  request<{ success: boolean; moved: number; message: string }>('/api/cabinets/batch-move', {
+    method: 'PUT',
+    body: JSON.stringify({ ids, zoneId }),
+  });
+
 // ==================== 标签 API ====================
 
 /** 获取所有标签（公开） */

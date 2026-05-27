@@ -529,4 +529,4 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   );
 };
 
-export default DetailPanel;
+export default React.memo(DetailPanel);

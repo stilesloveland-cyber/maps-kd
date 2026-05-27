@@ -4,8 +4,9 @@
  * 负责数据加载、状态管理、业务逻辑编排
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Filter, Plus, Layers } from 'lucide-react';
+import { Filter, Plus, Layers, Trash2, Move } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import type { Cabinet, Tag as TagType, Zone, SystemMeta } from '../types';
 import {
   getCabinets,
@@ -20,6 +21,8 @@ import {
   createZone,
   updateZone,
   batchGenerateCabinets,
+  batchDeleteCabinets,
+  batchMoveCabinets,
 } from '../api';
 import Toolbar from '../components/Toolbar';
 import MapCanvas, { MapCanvasRef } from '../components/MapCanvas';
@@ -53,6 +56,7 @@ const generateNumber = (cabinets: Cabinet[]): string => {
 
 const MapPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
 
   // ==================== 数据状态 ====================
   const [cabinets, setCabinets] = useState<Cabinet[]>([]);
@@ -68,6 +72,8 @@ const MapPage: React.FC = () => {
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState<boolean>(false);
   const [showBatchModal, setShowBatchModal] = useState<boolean>(false);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // 用于触发添加柜机的坐标
   const addPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -148,11 +154,65 @@ const MapPage: React.FC = () => {
     try {
       const newCabinets = await batchGenerateCabinets({ count, tagId });
       setCabinets((prev) => [...prev, ...newCabinets]);
+      toast(`成功生成 ${count} 个柜机`, 'success');
     } catch (err) {
       console.error('批量生成失败:', err);
-      alert('批量生成失败: ' + (err as Error).message);
+      toast('批量生成失败: ' + (err as Error).message, 'error');
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, toast]);
+
+  /**
+   * 多选模式：点击柜机切换选中
+   */
+  const handleToggleSelect = useCallback((cabinetId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cabinetId)) {
+        next.delete(cabinetId);
+      } else {
+        next.add(cabinetId);
+      }
+      return next;
+    });
+  }, []);
+
+  /**
+   * 批量删除柜机
+   */
+  const handleBatchDelete = useCallback(async () => {
+    if (!isAuthenticated || selectedIds.size === 0) return;
+    if (!window.confirm(`确定要删除选中的 ${selectedIds.size} 个柜机吗？此操作不可撤销！`)) return;
+
+    try {
+      const result = await batchDeleteCabinets(Array.from(selectedIds));
+      setCabinets((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+      setSelectedIds(new Set());
+      setIsMultiSelectMode(false);
+      toast(result.message, 'success');
+    } catch (err) {
+      toast('批量删除失败: ' + (err as Error).message, 'error');
+    }
+  }, [isAuthenticated, selectedIds, toast]);
+
+  /**
+   * 批量移动柜机到区域
+   */
+  const handleBatchMove = useCallback(async (zoneId: string | null) => {
+    if (!isAuthenticated || selectedIds.size === 0) return;
+
+    try {
+      const result = await batchMoveCabinets(Array.from(selectedIds), zoneId);
+      const zone = zoneId ? zones.find((z) => z.id === zoneId) : null;
+      setCabinets((prev) => prev.map((c) =>
+        selectedIds.has(c.id) ? { ...c, zoneId } : c
+      ));
+      setSelectedIds(new Set());
+      setIsMultiSelectMode(false);
+      toast(result.message, 'success');
+    } catch (err) {
+      toast('批量移动失败: ' + (err as Error).message, 'error');
+    }
+  }, [isAuthenticated, selectedIds, zones, toast]);
 
   /**
    * 更新柜机名称
@@ -366,6 +426,59 @@ const MapPage: React.FC = () => {
         onResetView={handleResetView}
         onOpenLogin={() => setShowLoginModal(true)}
       />
+      {/* 批量操作工具栏 */}
+      <div className="batch-bar">
+        <button
+          className={`btn btn-sm ${isMultiSelectMode ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => {
+            setIsMultiSelectMode(!isMultiSelectMode);
+            setSelectedIds(new Set());
+          }}
+          title={isMultiSelectMode ? '退出多选模式' : '进入多选模式'}
+        >
+          <Filter size={14} />
+          {isMultiSelectMode ? '退出多选' : '多选'}
+        </button>
+        {isMultiSelectMode && (
+          <div className="batch-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className="batch-count">
+              已选 {selectedIds.size} 个
+            </span>
+            <button
+              className="btn btn-sm btn-outline"
+              disabled={selectedIds.size === 0}
+              onClick={handleBatchDelete}
+              title="批量删除"
+            >
+              <Trash2 size={14} /> 删除
+            </button>
+            {zones.length > 0 && (
+              <select
+                className="batch-zone-select"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleBatchMove(e.target.value);
+                  }
+                }}
+                disabled={selectedIds.size === 0}
+              >
+                <option value="">移动到区域...</option>
+                <option value="">无区域</option>
+                {zones.map((z) => (
+                  <option key={z.id} value={z.id}>{z.name}</option>
+                ))}
+              </select>
+            )}
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={() => { setIsMultiSelectMode(false); setSelectedIds(new Set()); }}
+            >
+              取消
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* 主内容区 */}
       <div className="main-content">
@@ -384,6 +497,9 @@ const MapPage: React.FC = () => {
           onClickEmpty={handleClickEmpty}
           onZoneDragEnd={handleZoneDragEnd}
           onZoneResize={handleZoneResize}
+          isMultiSelectMode={isMultiSelectMode}
+          selectedIds={selectedIds}
+          onToggleSelect={handleToggleSelect}
         />
 
         {/* 右侧面板区域（桌面端） */}
@@ -475,6 +591,29 @@ const MapPage: React.FC = () => {
           flex: 1;
           overflow-y: auto;
           border-top: 1px solid var(--color-border);
+        }
+        .batch-bar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          background: #fff;
+          border-bottom: 1px solid var(--color-border);
+          flex-shrink: 0;
+        }
+        .batch-count {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--color-primary);
+          padding: 0 4px;
+        }
+        .batch-zone-select {
+          padding: 4px 8px;
+          border-radius: 6px;
+          border: 1px solid var(--color-border);
+          font-size: 13px;
+          background: #fff;
+          cursor: pointer;
         }
         .mobile-bottom-bar {
           position: fixed;

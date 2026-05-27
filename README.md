@@ -216,6 +216,11 @@ Frontend (React 18 + TypeScript + Vite)
 | GET | `/api/backups` | 获取备份列表 | ✅ |
 | POST | `/api/backups` | 创建手动备份 | ✅ |
 | POST | `/api/backups/:id/rollback` | 回滚到指定版本 | ✅ |
+| DELETE | `/api/backups/:id` | 删除单个备份（受保护锁定） | ✅ |
+| DELETE | `/api/backups/auto` | 一键清除多余自动备份 | ✅ |
+| POST | `/api/cabinets/batch` | 批量生成带标签柜机 | ✅ |
+| POST | `/api/cabinets/batch-delete` | 批量删除柜机 | ✅ |
+| PUT | `/api/cabinets/batch-move` | 批量移动柜机到区域 | ✅ |
 | GET | `/api/stats` | 系统概览统计 | ✅ |
 | GET | `/api/cabinets/export` | 导出柜机 Excel | ✅ |
 | POST | `/api/cabinets/import` | 批量导入柜机 | ✅ |

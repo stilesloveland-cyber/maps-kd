@@ -238,4 +238,4 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   );
 };
 
-export default FilterPanel;
+export default React.memo(FilterPanel);

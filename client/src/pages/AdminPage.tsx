@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import type {
   SystemStats,
   LogEntry,
@@ -79,6 +80,7 @@ const LOG_TYPE_LABELS: Record<string, string> = {
 
 const AdminPage: React.FC = () => {
   const { isAuthenticated, username, logout } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   // 未登录重定向
@@ -231,10 +233,10 @@ const AdminPage: React.FC = () => {
 
     try {
       await apiRollbackBackup(backup.id);
-      alert('回滚成功！页面将重新加载数据。');
+      toast('回滚成功！页面将重新加载数据。', 'success');
       loadData();
     } catch (err: any) {
-      alert('回滚失败: ' + err.message);
+      toast('回滚失败: ' + err.message, 'error');
     }
   };
 
@@ -248,7 +250,7 @@ const AdminPage: React.FC = () => {
       const b = await getBackups();
       setBackups(b);
     } catch (err: any) {
-      alert('删除失败: ' + (err.message || '未知错误'));
+      toast('删除失败: ' + (err.message || '未知错误'), 'error');
     }
   };
 
@@ -259,11 +261,11 @@ const AdminPage: React.FC = () => {
 
     try {
       const result = await deleteAutoBackups();
-      alert(result.message);
+      toast(result.message, 'success');
       const b = await getBackups();
       setBackups(b);
     } catch (err: any) {
-      alert('清除失败: ' + (err.message || '未知错误'));
+      toast('清除失败: ' + (err.message || '未知错误'), 'error');
     }
   };
 
@@ -281,7 +283,7 @@ const AdminPage: React.FC = () => {
       const t = await getTags();
       setAllTags(t);
     } catch (err: any) {
-      alert('添加标签失败: ' + err.message);
+      toast('添加标签失败: ' + err.message, 'error');
     }
   };
 
@@ -291,7 +293,7 @@ const AdminPage: React.FC = () => {
       await apiDeleteTag(id);
       setAllTags((prev) => prev.filter((t) => t.id !== id));
     } catch (err: any) {
-      alert('删除标签失败: ' + err.message);
+      toast('删除标签失败: ' + err.message, 'error');
     }
   };
 
@@ -313,7 +315,7 @@ const AdminPage: React.FC = () => {
       const z = await getZones();
       setAllZones(z);
     } catch (err: any) {
-      alert('创建区域失败: ' + err.message);
+      toast('创建区域失败: ' + err.message, 'error');
     }
   };
 
@@ -323,7 +325,7 @@ const AdminPage: React.FC = () => {
       await apiDeleteZone(id);
       setAllZones((prev) => prev.filter((z) => z.id !== id));
     } catch (err: any) {
-      alert('删除区域失败: ' + err.message);
+      toast('删除区域失败: ' + err.message, 'error');
     }
   };
 
@@ -338,8 +340,9 @@ const AdminPage: React.FC = () => {
       a.download = `柜机数据_${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
+      toast('导出成功', 'success');
     } catch (err: any) {
-      alert('导出失败: ' + err.message);
+      toast('导出失败: ' + err.message, 'error');
     }
   };
 
@@ -373,7 +376,7 @@ const AdminPage: React.FC = () => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert('下载模板失败: ' + err.message);
+      toast('下载模板失败: ' + err.message, 'error');
     }
   };
 

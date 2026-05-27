@@ -328,6 +328,60 @@
         "响应式断点：≥1024px 桌面、≥768px 平板、<768px 手机",
         "不引入暗黑模式，始终保持浅色主题"
       ]
+    },
+    {
+      "id": "F021",
+      "name": "Toast 通知系统",
+      "description": "用优雅的 Toast 浮动通知替代所有 alert() 和部分 window.confirm()，提升用户体验。",
+      "acceptanceCriteria": [
+        "封装全局 Toast 组件和 useToast hook，支持 success/error/warning/info 四种类型",
+        "Toast 从右上角滑入，3秒后自动消失，可点击关闭",
+        "替换 MapPage 中所有 alert() 调用（批量生成失败、拖拽错误等）",
+        "替换 AdminPage 中所有 alert() 调用（创建备份、删除备份、回滚、导入导出等）",
+        "替换 AdminPage 中 window.confirm() 的确认后通知",
+        "支持连续弹出多条 Toast，堆叠显示"
+      ]
+    },
+    {
+      "id": "F022",
+      "name": "性能优化",
+      "description": "通过 Canvas 缓存、搜索防抖、React.memo 等手段优化前端渲染性能。",
+      "acceptanceCriteria": [
+        "Canvas 柜机组启用 Konva 缓存机制（cache()），减少重绘",
+        "搜索框输入添加 200ms 防抖（useDebounce），避免高频渲染",
+        "FilterPanel 使用 React.memo 包裹，避免无关更新时重渲染",
+        "DetailPanel 使用 React.memo 包裹，避免无关更新时重渲染",
+        "搜索下拉列表用 CSS will-change 优化滚动性能"
+      ]
+    },
+    {
+      "id": "F023",
+      "name": "柜机批量操作（删除/移动）",
+      "description": "支持多选柜机后批量删除或批量移动到某个区域，适合大规模布局调整场景。",
+      "acceptanceCriteria": [
+        "工具栏新增多选模式开关按钮，开启后每个柜机左上角显示复选框",
+        "也可按住 Shift 键点击柜机实现多选",
+        "选中多个柜机后，工具栏出现批量操作按钮组：批量删除、批量移动",
+        "批量删除：调用后端 API 一次性删除所有选中柜机，确认后执行",
+        "批量删除只创建一次自动备份快照",
+        "批量移动：弹出区域选择下拉框，选择目标区域后所有选中柜机移到该区域",
+        "每个柜机的 zoneId 更新为选中区域",
+        "批量操作完成后取消多选模式，画布刷新",
+        "操作记录记入日志（如"批量删除 5 个柜机"、"批量移动 3 个柜机到 A区"）",
+        "后端 POST /api/cabinets/batch-delete 接收 { ids: string[] }",
+        "后端 PUT /api/cabinets/batch-move 接收 { ids: string[], zoneId: string | null }"
+      ]
+    },
+    {
+      "id": "F024",
+      "name": "前端构建验证（pre-commit hook）",
+      "description": "在 git commit 前自动运行前端 TypeScript 类型检查，防止类型错误进入仓库。",
+      "acceptanceCriteria": [
+        "安装 husky 作为 git hooks 工具",
+        "配置 pre-commit hook 自动执行 cd client && npx tsc --noEmit",
+        "类型检查失败时阻止 commit，并提示具体错误",
+        "对运行性能无影响（tsc --noEmit 通常 5-10 秒内完成）"
+      ]
     }
   ],
   "dataModel": {
@@ -415,6 +469,8 @@
       { "method": "POST", "path": "/api/cabinets/batch", "description": "批量生成带标签柜机（需登录，接收 { count, tagId }）" },
       { "method": "PUT", "path": "/api/cabinets/:id", "description": "更新柜机信息（需登录）" },
       { "method": "DELETE", "path": "/api/cabinets/:id", "description": "删除柜机（需登录）" },
+      { "method": "POST", "path": "/api/cabinets/batch-delete", "description": "批量删除柜机（需登录，接收 { ids: string[] }）" },
+      { "method": "PUT", "path": "/api/cabinets/batch-move", "description": "批量移动柜机到区域（需登录，接收 { ids: string[], zoneId }）" },
       { "method": "PUT", "path": "/api/cabinets/:id/position", "description": "更新柜机位置（需登录）" },
       { "method": "PUT", "path": "/api/cabinets/:id/tags", "description": "更新柜机标签（需登录）" },
       { "method": "GET", "path": "/api/tags", "description": "获取所有标签（公开）" },

@@ -500,6 +500,124 @@ router.post('/batch', authMiddleware, (req: Request, res: Response): void => {
 
 /**
  * @swagger
+ * /api/cabinets/batch-delete:
+ *   post:
+ *     summary: 批量删除柜机
+ *     description: 一次性删除多个柜机（需登录），只创建一次自动备份
+ *     tags: [柜机管理]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ */
+router.post('/batch-delete', authMiddleware, (req: Request, res: Response): void => {
+  const { ids }: { ids: string[] } = req.body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: '请提供要删除的柜机 ID 列表' });
+    return;
+  }
+
+  const db = getDatabase();
+
+  const deleteStmt = db.prepare('DELETE FROM cabinets WHERE id = ?');
+  let deletedCount = 0;
+
+  const deleteTransaction = db.transaction(() => {
+    for (const id of ids) {
+      const result = deleteStmt.run(id);
+      if (result.changes > 0) deletedCount++;
+    }
+  });
+
+  deleteTransaction();
+
+  if (deletedCount > 0) {
+    incrementDataVersion();
+    addLog('del_cabinet', `批量删除 ${deletedCount} 个柜机`, req.admin!.username);
+    createAutoSnapshot();
+  }
+
+  res.json({ success: true, deleted: deletedCount, message: `已删除 ${deletedCount} 个柜机` });
+});
+
+/**
+ * @swagger
+ * /api/cabinets/batch-move:
+ *   put:
+ *     summary: 批量移动柜机到区域
+ *     description: 将多个柜机移动到指定区域（需登录），zoneId 为 null 时移出区域
+ *     tags: [柜机管理]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               zoneId:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: 移动成功
+ */
+router.put('/batch-move', authMiddleware, (req: Request, res: Response): void => {
+  const { ids, zoneId }: { ids: string[]; zoneId: string | null } = req.body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: '请提供要移动的柜机 ID 列表' });
+    return;
+  }
+
+  const db = getDatabase();
+
+  const updateStmt = db.prepare('UPDATE cabinets SET zoneId = ?, updatedAt = ? WHERE id = ?');
+  const now = new Date().toISOString();
+  let movedCount = 0;
+
+  const moveTransaction = db.transaction(() => {
+    for (const id of ids) {
+      const result = updateStmt.run(zoneId || null, now, id);
+      if (result.changes > 0) movedCount++;
+    }
+  });
+
+  moveTransaction();
+
+  if (movedCount > 0) {
+    incrementDataVersion();
+    const zoneName = zoneId
+      ? (db.prepare('SELECT name FROM zones WHERE id = ?').get(zoneId) as { name: string } | undefined)?.name || '未知区域'
+      : '无区域';
+    addLog('edit_cabinet', `批量移动 ${movedCount} 个柜机到 ${zoneName}`, req.admin!.username);
+  }
+
+  res.json({ success: true, moved: movedCount, message: `已移动 ${movedCount} 个柜机` });
+});
+
+/**
+ * @swagger
  * /api/cabinets/{id}:
  *   put:
  *     summary: 更新柜机信息

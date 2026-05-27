@@ -16,6 +16,7 @@
 ├── docker-compose.yml       ← 一键部署
 ├── deploy.sh / deploy.ps1   ← 可选交互式部署脚本
 ├── .env.example             ← 环境变量模板
+├── .husky/pre-commit        ← git 提交前自动 tsc 检查
 │
 ├── server/                  ← 后端 (Express + TypeScript + SQLite)
 │   ├── src/
@@ -24,30 +25,35 @@
 │   │   ├── middleware/auth.ts ← JWT 认证
 │   │   └── routes/
 │   │       ├── auth.ts      ← 登录/改密/状态检查 → 单管理员，密码默认 admin123
-│   │       ├── cabinets.ts  ← 柜机 CRUD + 拖拽位置 + 导入导出 Excel
+│   │       ├── cabinets.ts  ← 柜机 CRUD + 拖拽位置 + 批量生成 + 批量删除/移动 + 导入导出 Excel
 │   │       ├── tags.ts      ← 标签 CRUD（13个预置标签不可删）
 │   │       ├── zones.ts     ← 区域 CRUD
 │   │       ├── logs.ts      ← 操作日志（分页/筛选）
-│   │       ├── backups.ts   ← 备份管理 + 回滚
+│   │       ├── backups.ts   ← 备份管理 + 回滚 + 清理
 │   │       └── stats.ts     ← 系统概览统计
 │   └── data/                ← SQLite 数据库文件（运行时生成）
 │
 └── client/                  ← 前端 (React 18 + Vite + react-konva)
     └── src/
         ├── main.tsx         ← 入口
-        ├── App.tsx          ← 路由：/ → MapPage, /admin → AdminPage
+        ├── App.tsx          ← 路由 + ToastProvider 包裹
         ├── types.ts         ← 所有 TypeScript 类型定义
         ├── index.css        ← 全局样式 + 响应式断点 + CSS 变量
         ├── api/index.ts     ← API 封装层（自动携带 JWT Token）
-        ├── context/AuthContext.tsx ← 登录状态管理
+        ├── hooks/
+        │   └── useDebounce.ts ← 防抖 hook（搜索优化）
+        ├── context/
+        │   ├── AuthContext.tsx  ← 登录状态管理
+        │   └── ToastContext.tsx ← Toast 通知系统
         ├── components/
-        │   ├── MapCanvas.tsx   ← 核心画布（react-konva）
-        │   ├── Toolbar.tsx     ← 导航栏（搜索/添加/缩放/后台/登录）
-        │   ├── FilterPanel.tsx ← 标签筛选面板
-        │   ├── DetailPanel.tsx ← 柜机详情面板（编辑标签/区域）
-        │   └── LoginModal.tsx  ← 登录弹窗
+        │   ├── MapCanvas.tsx   ← 核心画布（react-konva，支持多选模式）
+        │   ├── Toolbar.tsx     ← 导航栏（搜索/添加/批量生成/缩放/后台/登录）
+        │   ├── FilterPanel.tsx ← 标签筛选面板（React.memo 优化）
+        │   ├── DetailPanel.tsx ← 柜机详情面板（React.memo 优化）
+        │   ├── LoginModal.tsx  ← 登录弹窗
+        │   └── BatchModal.tsx  ← 批量生成弹窗
         └── pages/
-            ├── MapPage.tsx     ← 主地图页面（数据加载 + 业务逻辑编排）
+            ├── MapPage.tsx     ← 主地图页面（数据加载 + 批量操作 + Toast）
             └── AdminPage.tsx   ← 后台管理页面（8大功能卡片）
 ```
 
@@ -62,12 +68,13 @@
 
 ### 2. 操作日志
 - 所有操作自动记录 logs 表
-- 类型包括：`add_cabinet/del_cabinet/move_cabinet/edit_cabinet/edit_tags/create_zone/edit_zone/del_zone/import_cabinets/export_cabinets/create_backup/rollback/login/logout/change_password`
+- 类型包括：`add_cabinet/del_cabinet/move_cabinet/edit_cabinet/edit_tags/create_zone/edit_zone/del_zone/import_cabinets/export_cabinets/create_backup/delete_backup/rollback/login/logout/change_password`
 
 ### 3. 版本备份与回滚
 - **自动备份**：每次添加/删除柜机时触发
 - **手动备份**：管理员在后台创建带备注的检查点
 - **回滚保护**：回滚前自动备份当前状态
+- **备份清理**：一键清除多余自动备份（保留最近10个），手动备份可逐条删除（受最近3个保护）
 
 ### 4. 柜机拖拽
 - 拖拽后通过 ref 缓存位置（避免 React 全量重绘导致闪白）
@@ -85,6 +92,15 @@
 - 拖拽超过 3px 自动取消柜机选中，避免干扰
 - 触屏单指拖动 + 双指缩放，代码在 `handleTouchStart/Move/End` 中
 
+### 7. 批量生成带标签柜机
+- 工具栏「批量生成」按钮 → 弹窗输入数量和选择标签 → 自动编号 + 排列 + 挂标签
+- 后端 `POST /api/cabinets/batch`
+
+### 8. 批量操作（多选模式）
+- 工具栏「多选」按钮开启多选模式 → 点击柜机进行多选
+- 选中后出现批量删除 / 批量移动到区域操作按钮
+- 后端 `POST /api/cabinets/batch-delete` + `PUT /api/cabinets/batch-move`
+
 ---
 
 ## 三、最近的重要改动
@@ -99,8 +115,14 @@
 | 6 | 区域交互增强 | MapCanvas.tsx, MapPage.tsx | 区域支持拖拽移动 + 四角手柄调整大小 |
 | 7 | 拖拽防止闪白 | MapCanvas.tsx, MapPage.tsx | 用 ref 缓存拖拽位置，不用 setState 重绘 |
 | 8 | 搜索自动聚焦 | MapCanvas.tsx, MapPage.tsx | 点击搜索结果自动平移到对应柜机 |
-| 9 | 登录兼容 | auth.ts | 后端兼容前端只传密码的方式，默认 admin 用户名 |
-| 10 | Dockerfile 修复 | Dockerfile | npm ci → npm install，移除废弃 version 字段 |
+| 9 | 批量生成柜机 | MapPage.tsx, BatchModal.tsx, server | 批量 N 个柜机 + 自动编号 + 指定标签 + 排列 |
+| 10 | 备份清理 | AdminPage.tsx, backups.ts | 一键清自动备份 + 逐条删手动备份 + 保护锁定 |
+| 11 | Canvas 缓存 | MapCanvas.tsx | 柜机组启用 Konva cache()，减少重绘 |
+| 12 | 搜索防抖 | Toolbar.tsx, useDebounce.ts | 200ms 防抖，避免高频过滤 |
+| 13 | Toast 通知 | ToastContext.tsx | 替换所有 alert()，右上角滑入通知 |
+| 14 | 批量操作 | MapPage.tsx, cabinets.ts | 多选模式 + 批量删除/移动 |
+| 15 | 主界面美化 | index.css, MapPage.tsx | 按钮动效、悬浮 FAB、面板动画、移动端适配 |
+| 16 | pre-commit | package.json, .husky/ | commit 前自动运行 tsc --noEmit |
 
 ---
 
@@ -130,6 +152,17 @@ export interface MapCanvasRef {
 - 构建后的前端文件在 `client/dist`
 - 后端在 `/` 路由 serve 这个目录
 - 所有非 API 路由返回 `index.html`（支持前端 History 路由）
+
+### 4.5 Toast 通知系统
+- `ToastProvider` 在 `App.tsx` 根级别包裹
+- 任意组件通过 `useToast()` 获取 `{ toast }` 函数
+- 支持 4 种类型：success / error / warning / info
+- 3 秒自动消失，右上角滑入，手机端全宽显示
+
+### 4.6 性能优化要点
+- **Canvas 缓存**：柜机 `<Group>` 通过 callback ref 调用 `node.cache()`
+- **搜索防抖**：`useDebounce` hook 延迟 200ms 过滤搜索结果
+- **React.memo**：`FilterPanel` 和 `DetailPanel` 用 `React.memo` 包裹避免无关重绘
 
 ---
 
@@ -164,6 +197,7 @@ sudo docker compose up -d --build
 1. **不要随意改 node_modules**：用 `npm install` 管理依赖
 2. **TypeScript strict 模式**：所有函数参数、事件参数必须显式标注类型
 3. **前端组件样式用内联 `<style>`**：每个组件自带 CSS，不改全局样式
-4. **后端添加 API**：在 `routes/` 下新建文件 → 在 `index.ts` 注册路由 → 加 Swagger JSDoc 注释
+4. **后端添加 API**：在 `routes/` 下新建文件 → 在 `index.ts` 注册路由 → 加 Swagger JSDoc 注释；注意静态路由（/batch, /batch-delete 等）必须在 `/:id` 通配路由之前注册
 5. **数据模型改字段**：改 `db.ts` 建表语句 + `client/src/types.ts` + 路由中的 SQL 查询
 6. **推送注意**：用户自己手动 `git push`，AI 只管写代码
+7. **首次安装 husky**：在项目根目录运行 `npm install` 会自动触发 `prepare` 脚本初始化 husky hooks

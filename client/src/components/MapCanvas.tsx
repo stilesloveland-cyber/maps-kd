@@ -81,6 +81,12 @@ interface MapCanvasProps {
   onZoneDragEnd: (zoneId: string, x: number, y: number) => void;
   /** 区域大小调整结束回调 */
   onZoneResize: (zoneId: string, x: number, y: number, width: number, height: number) => void;
+  /** 是否多选模式 */
+  isMultiSelectMode?: boolean;
+  /** 已选中的柜机 ID 集合 */
+  selectedIds?: Set<string>;
+  /** 多选模式切换选中回调 */
+  onToggleSelect?: (cabinetId: string) => void;
 }
 
 // ---------- 辅助函数 ----------
@@ -132,6 +138,9 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   onClickEmpty,
   onZoneDragEnd,
   onZoneResize,
+  isMultiSelectMode = false,
+  selectedIds,
+  onToggleSelect,
 }, ref) => {
   const { isAuthenticated } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -668,11 +677,20 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                 opacity={opacity}
                 draggable={isAuthenticated && !isFilterActive}
                 onDragStart={() => { cabinetDraggingRef.current = true; }}
-                onClick={(e: Konva.KonvaEventObject<MouseEvent>) => {
-                  e.cancelBubble = true;
-                  if (isDraggingRef.current) return;
-                  onSelectCabinet(cabinet.id);
+                ref={(node) => {
+                  if (node && !node.isCached()) {
+                    node.cache();
+                  }
                 }}
+                onClick={(e: Konva.KonvaEventObject<MouseEvent>) => {
+                    e.cancelBubble = true;
+                    if (isDraggingRef.current) return;
+                    if (isMultiSelectMode && onToggleSelect) {
+                      onToggleSelect(cabinet.id);
+                    } else {
+                      onSelectCabinet(cabinet.id);
+                    }
+                  }}
                 onTap={(e: Konva.KonvaEventObject<TouchEvent>) => {
                   e.cancelBubble = true;
                   onSelectCabinet(cabinet.id);
