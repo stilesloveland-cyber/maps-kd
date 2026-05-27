@@ -427,7 +427,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
     <div
       className="canvas-container"
       ref={containerRef}
-      onMouseDown={(e) => {
+      onMouseDown={(e: React.MouseEvent) => {
         // 统一在容器上捕获 mousedown，确保选中柜机后也能拖动地图
         mouseDragRef.current = {
           isDown: true,
@@ -437,7 +437,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
           stageY: stageConfig.y,
         };
       }}
-      onMouseMove={(e) => {
+      onMouseMove={(e: React.MouseEvent) => {
         if (!mouseDragRef.current.isDown) return;
         const dx = e.clientX - mouseDragRef.current.startX;
         const dy = e.clientY - mouseDragRef.current.startY;
@@ -471,7 +471,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onContentClick={(e) => {
+        onContentClick={(e: Konva.KonvaEventObject<MouseEvent>) => {
           // 点击画布空白区域取消选中
           if (!mouseDragRef.current.isDown) {
             onSelectCabinet(null);
