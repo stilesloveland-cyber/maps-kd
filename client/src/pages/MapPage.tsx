@@ -193,9 +193,7 @@ const MapPage: React.FC = () => {
   const handleCabinetDragEnd = useCallback(async (cabinetId: string, x: number, y: number) => {
     try {
       await updateCabinetPosition(cabinetId, { x, y });
-      setCabinets((prev) =>
-        prev.map((c) => (c.id === cabinetId ? { ...c, x, y } : c))
-      );
+      // 不触发全量 setCabinets，由 MapCanvas 内部通过 ref 保持位置同步
     } catch (err) {
       console.error('更新柜机位置失败:', err);
     }

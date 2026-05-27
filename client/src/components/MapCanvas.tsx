@@ -140,8 +140,11 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
     scale: 0.8,
   });
 
-  // 容器尺寸状态
+  ///** 容器尺寸状态 */
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+
+  /** 拖拽后的柜机位置缓存（避免重绘闪烁） */
+  const draggedPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
   // 触屏双指缩放的初始距离记录
   const lastTouchDistRef = useRef<number | null>(null);
@@ -504,11 +507,16 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
               : 'transparent';
             const strokeWidth = isSelected || isSearchHighlight ? 3 : 0;
 
+            // 使用拖拽缓存位置（如果有），避免重绘闪烁
+            const draggedPos = draggedPositionsRef.current.get(cabinet.id);
+            const posX = draggedPos ? draggedPos.x : cabinet.x;
+            const posY = draggedPos ? draggedPos.y : cabinet.y;
+
             return (
               <Group
                 key={cabinet.id}
-                x={cabinet.x}
-                y={cabinet.y}
+                x={posX}
+                y={posY}
                 width={w}
                 height={h}
                 opacity={opacity}
@@ -523,15 +531,11 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   onSelectCabinet(cabinet.id);
                 }}
                 onDragEnd={(e) => {
-                  const newX = cabinet.x + (e.target.x() - cabinet.x);
-                  const newY = cabinet.y + (e.target.y() - cabinet.y);
-                  // 修正 - 使用绝对位置
                   const node = e.target;
-                  onCabinetDragEnd(
-                    cabinet.id,
-                    node.x(),
-                    node.y(),
-                  );
+                  const newX = node.x();
+                  const newY = node.y();
+                  draggedPositionsRef.current.set(cabinet.id, { x: newX, y: newY });
+                  onCabinetDragEnd(cabinet.id, newX, newY);
                 }}
               >
                 {/* 选中/搜索高亮外发光 */}
