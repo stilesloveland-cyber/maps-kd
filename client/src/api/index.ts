@@ -156,6 +156,13 @@ export const createTag = (tag: { name: string; category: string; color: string }
 export const deleteTag = (id: string): Promise<{ success: boolean }> =>
   request<{ success: boolean }>(`/api/tags/${id}`, { method: 'DELETE' });
 
+/** 更新标签（需登录） */
+export const updateTag = (id: string, data: { name?: string; color?: string }): Promise<Tag> =>
+  request<Tag>(`/api/tags/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+
 // ==================== 区域 API ====================
 
 /** 获取所有区域（公开） */

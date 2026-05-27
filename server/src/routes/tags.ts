@@ -157,4 +157,62 @@ router.delete('/:id', authMiddleware, (req: Request, res: Response): void => {
   res.json({ message: `标签 "${tag.name}" 已删除` });
 });
 
+/**
+ * @swagger
+ * /api/tags/{id}:
+ *   put:
+ *     summary: 更新标签
+ *     description: 更新指定标签的名称或颜色（需登录）
+ *     tags: [标签管理]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 标签 ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: 标签名称（可选）
+ *               color:
+ *                 type: string
+ *                 description: 标签颜色（可选）
+ *     responses:
+ *       200:
+ *         description: 更新成功
+ *       404:
+ *         description: 标签不存在
+ */
+router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
+  const id: string = req.params.id;
+  const { name, color }: { name?: string; color?: string } = req.body;
+
+  const db = getDatabase();
+  const tag = db.prepare('SELECT * FROM tags WHERE id = ?').get(id) as { id: string; name: string; category: string; color: string } | undefined;
+
+  if (!tag) {
+    res.status(404).json({ error: '标签不存在' });
+    return;
+  }
+
+  const newName = name ? name.trim() : tag.name;
+  const newColor = color || tag.color;
+
+  db.prepare('UPDATE tags SET name = ?, color = ? WHERE id = ?').run(newName, newColor, id);
+
+  incrementDataVersion();
+  addLog('edit_tags', `更新标签 "${tag.name}" -> "${newName}"`, req.admin!.username);
+
+  res.json({ ...tag, name: newName, color: newColor });
+});
+
 export default router;

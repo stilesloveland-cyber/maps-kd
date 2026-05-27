@@ -1,6 +1,6 @@
 {
   "appName": "快递柜可视化地图管理系统",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "一个可部署在服务器上的Web应用，用于可视化查看和管理快递驿站不同编号快递柜的相对位置。支持地图式拖拽、缩放、标签筛选、柜机管理、操作日志、版本备份与回滚、管理员权限控制、全局搜索及移动端适配。",
   "techStack": {
     "frontend": {
@@ -476,6 +476,144 @@
         "四角调整手柄拖拽时尺寸变化平滑",
         "区域渲染使用 Konva 缓存机制减少重绘",
         "调整手柄的 onDragMove 事件处理优化，减少不必要的状态更新"
+      ]
+    },
+    {
+      "id": "F030",
+      "name": "柜机吸附改为按柜机吸附（替代网格吸附）",
+      "description": "将柜机拖拽结束时的吸附逻辑从「吸附到网格线交点」改为「吸附到其他柜机边缘和中心线」，使柜机之间的相对排列更加整齐。",
+      "backwardCompatibility": "替代现有 F026 的网格吸附逻辑。F026 中描述的网格吸附（GRID_SIZE=50 倍数）不再生效，改为柜机间吸附。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "拖拽柜机释放时，检测当前柜机与画布上所有其他柜机的边缘距离",
+        "吸附参考线包括：其他柜机的左边缘、右边缘、上边缘、下边缘、水平中心线、垂直中心线",
+        "当柜机边缘/中心线与参考线距离 ≤10px 时，自动吸附对齐",
+        "吸附时画布上显示一条细蓝色虚线作为对齐参考线，松手后参考线消失",
+        "按住 Ctrl 或 Shift 键拖拽时临时关闭吸附功能",
+        "吸附仅在拖拽结束后执行，不改变拖拽过程中的实时位置",
+        "原 F026 的网格吸附代码（MapCanvas.tsx onDragEnd 中的 GRID_SIZE 计算）替换为遍历所有柜机计算最近吸附参考线",
+        "GridLine 组件（网格线渲染）保留不变，仅移除网格线吸附逻辑"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — onDragEnd 回调中吸附逻辑重写"
+      ]
+    },
+    {
+      "id": "F031",
+      "name": "移动端柜机名称显示优化（高密度柜机场景）",
+      "description": "当画布上柜机数量较多（>10 台）时，移动端屏幕上柜机名称文字互相堆叠重叠，用户无法直观识别。需要根据缩放级别和柜机密度智能控制名称显示。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "柜机名称文字（cabinetName）根据当前画布缩放比例（scale）动态调整显示/隐藏：",
+        "  - scale ≥ 0.8 时，所有柜机始终显示名称",
+        "  - 0.5 ≤ scale < 0.8 时，仅选中/搜索高亮的柜机显示名称",
+        "  - scale < 0.5 时，所有柜机隐藏名称，仅在 hover/tap 时通过 Tooltip 显示",
+        "移动端（<768px）增加额外的密度保护：当可见区域柜机密度 > 3 台/10000px² 时，额外增加一个缩放级别的名称隐藏阈值（如 scale < 1.0 时就开始隐藏非选中柜机名称）",
+        "柜机被选中（selectedCabinetId）或搜索高亮（searchHighlightId）时，无论缩放级别始终显示其名称",
+        "hover/tap 时通过 Konva Tooltip 或 title 属性显示柜机名称作为备选方案",
+        "以上逻辑不影响桌面端（≥768px）的柜机名称显示行为"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — 柜机 Text 节点的 visible 属性增加缩放/密度判断逻辑"
+      ]
+    },
+    {
+      "id": "F032",
+      "name": "指南针方向显示修正",
+      "description": "当前画布右上角指南针的方向标注与实际方向不一致：上方显示为「西」、右侧显示为「北」、下方显示为「东」、左侧显示为「南」。需要修正为正确的方向映射：上=北、右=东、下=南、左=西。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "指南针圆形组件中四个方向标签的 CSS 绝对定位修正：",
+        "  - .compass-n（北）位于圆心正上方 (top: 6px, left: 50%, transform: translateX(-50%))",
+        "  - .compass-e（东）位于圆心正右方 (right: 6px, top: 50%, transform: translateY(-50%))",
+        "  - .compass-s（南）位于圆心正下方 (bottom: 6px, left: 50%, transform: translateX(-50%))",
+        "  - .compass-w（西）位于圆心正左方 (left: 6px, top: 50%, transform: translateY(-50%))",
+        "指南针指针（.compass-needle）的红色箭头指向正上方（北），灰色尾部指向正下方（南）",
+        "指南针为纯视觉装饰，不随画布旋转/缩放联动，始终保持固定方向和大小（64×64px）",
+        "指南针组件 pointer-events: none，不阻挡画布交互"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — 指南针部分的内联 CSS 样式修正"
+      ]
+    },
+    {
+      "id": "F033",
+      "name": "标签修改后柜机样式自动同步",
+      "description": "当管理员在后台修改某个标签的属性（如颜色）后，所有关联该标签且开启了「跟随标签颜色」开关的柜机，其底色应自动同步更新为新颜色。当前存在标签修改后柜机样式不同步的问题。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "后台标签管理中修改标签颜色后，调用后端 API 更新标签",
+        "后端标签更新接口（PUT /api/tags/:id）成功返回后，前端自动重新加载所有柜机数据（含颜色）",
+        "前端柜机列表重新渲染时，开启了 followTagColor=true 的柜机自动使用标签新颜色",
+        "如果用户在前端地图页面（MapPage），标签修改后无需刷新页面即可看到柜机颜色变化",
+        "同步范围：仅影响 followTagColor=true 的柜机；followTagColor=false 的柜机（手动设置颜色）不受影响",
+        "不需要轮询机制，仅在标签修改操作后触发一次性同步"
+      ],
+      "filesToModify": [
+        "client/src/pages/AdminPage.tsx — 标签编辑/删除后触发柜机数据重新加载的信号",
+        "client/src/pages/MapPage.tsx — 监听标签变更事件或提供全局刷新机制"
+      ]
+    },
+    {
+      "id": "F034",
+      "name": "工具栏缩放按钮点击修复",
+      "description": "当前导航栏上方的放大（+）和缩小（-）按钮点击后无反应，需要修复使其能正常放大和缩小画布视图。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "点击放大按钮（+），画布以当前视口中心为基准放大（scale 递增步长 0.1，最大不超过 3.0）",
+        "点击缩小按钮（-），画布以当前视口中心为基准缩小（scale 递减步长 0.1，最小不低于 0.2）",
+        "点击重置视图按钮，画布恢复默认缩放（scale=0.6）并居中到驿站入口位置",
+        "鼠标滚轮缩放功能保持现有行为不变（以鼠标位置为中心缩放）",
+        "缩放按钮的 onClick 回调链路完整：Toolbar 接收 onZoomIn/onZoomOut/onResetView props → 父组件调用 MapCanvas ref 的对应方法 → MapCanvas 修改 stage scale"
+      ],
+      "filesToModify": [
+        "client/src/pages/MapPage.tsx — 检查并修复 zoomIn/zoomOut/resetView 回调实现",
+        "client/src/components/MapCanvas.tsx — 如需要，扩展 useImperativeHandle 暴露的方法",
+        "client/src/components/Toolbar.tsx — 确认 props 传递无遗漏"
+      ]
+    },
+    {
+      "id": "F035",
+      "name": "搜索结果柜机突出显示增强",
+      "description": "用户在搜索框中搜索柜机并点击结果后，目标柜机需要更强的视觉突出效果，确保用户能快速在画布上定位到它。当前已有绿色高亮和阴影，但需要进一步增强使其更醒目。",
+      "priority": "medium",
+      "acceptanceCriteria": [
+        "搜索选中柜机后，画布自动平移到该柜机并居中（已实现，确认功能正常）",
+        "搜索高亮的柜机增加脉冲动画效果：外发光阴影从模糊度 shadowBlur=20 到 shadowBlur=35 循环呼吸（CSS animation 或 requestAnimationFrame），持续 3 秒后自动恢复静态高亮",
+        "搜索高亮的柜机边框加粗至 4px（当前为 3px），颜色保持绿色 #22c55e",
+        "搜索高亮的柜机上方名称文字临时放大 2px（fontSize+2），颜色变为绿色加粗",
+        "画布平移过程中有一个平滑的过渡动画（ease-in-out，约 300ms）",
+        "当用户点击其他柜机或点击画布空白区域后，搜索高亮状态应清除（已实现，确认功能正常）",
+        "搜索高亮效果在移动端同样可见且醒目"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — 搜索高亮柜机的渲染逻辑增强（脉冲动画、边框加粗、名称放大）",
+        "client/src/pages/MapPage.tsx — 确保 panToCabinet 调用后正确传递 searchHighlightId"
+      ]
+    },
+    {
+      "id": "F036",
+      "name": "kd 快捷命令与 deploy.sh 优化",
+      "description": "在终端中配置 `kd` 快捷命令，输入后自动运行 deploy.sh 快捷管理脚本。同时对该脚本进行优化，提升可用性和健壮性。",
+      "priority": "medium",
+      "acceptanceCriteria": [
+        "Windows PowerShell：通过 Profile 文件添加 alias 函数 `kd`，调用 deploy.ps1 脚本",
+        "Linux/macOS：在 ~/.bashrc 或 ~/.zshrc 中添加 alias `kd='~/maps-kd/deploy.sh'`",
+        "deploy.sh 优化建议（以注释形式记录在脚本开头，或创建单独的优化文档）：",
+        "  - 增加项目目录自动检测：若 ~/maps-kd 不存在则搜索其他路径或提示用户输入",
+        "  - 增加选项 3「查看运行状态」：执行 docker ps 和 docker compose logs --tail=20",
+        "  - 增加选项 4「查看容器日志」：执行 docker compose logs -f（实时跟踪）",
+        "  - 增加选项 5「重启服务」：执行 docker compose restart（比 rebuild 更快）",
+        "  - 部署前增加磁盘空间检查（df -h），空间不足时警告",
+        "  - 增加 Docker 服务状态检测（docker info），Docker 未运行时提示启动",
+        "  - 构建前增加交互确认提示：显示即将构建并清除旧容器，请用户按 Enter 确认",
+        "  - 增加彩色终端输出（ANSI color codes）：成功=绿色、警告=黄色、错误=红色",
+        "  - 增加选项 6「数据库备份」：复制 server/data/cabinet.db 到备份目录并添加时间戳"
+      ],
+      "filesToModify": [
+        "deploy.sh — 增加优化改进",
+        "deploy.ps1 — 同步增强 Windows 版脚本功能",
+        "新增文档：部署环境说明（如 ~/.bashrc 或 Windows Profile 的快捷命令配置指引）"
       ]
     }
   ],

@@ -122,10 +122,10 @@ const generateGridLines = (width: number, height: number) => {
 /** MapCanvas 暴露给父组件的方法 */
 export interface MapCanvasRef {
   getCanvasCenter: () => { x: number; y: number };
-  /** 重置视图到驿站入口中心 */
   resetView: () => void;
-  /** 平移到指定柜机位置 */
   panToCabinet: (cabinetId: string) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
 }
 
 /** 获取柜机的品牌名称（取第一个 brand 类标签） */
@@ -198,6 +198,9 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   // 区域拖拽/调整中标志
   const zoneDraggingRef = useRef(false);
 
+  // 搜索高亮脉冲动画相位（0-1，用于呼吸效果）
+  const [searchPulsePhase, setSearchPulsePhase] = useState(0);
+
   // 鼠标拖拽平移
   const mouseDragRef = useRef<{ isDown: boolean; startX: number; startY: number; stageX: number; stageY: number }>({
     isDown: false, startX: 0, startY: 0, stageX: 0, stageY: 0,
@@ -251,6 +254,21 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
     };
   }, []);
 
+  useEffect(() => {
+    if (!searchHighlightId) return;
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - start;
+      if (elapsed > 3000) {
+        setSearchPulsePhase(0);
+        clearInterval(interval);
+        return;
+      }
+      setSearchPulsePhase(Math.sin(elapsed / 200) * 0.5 + 0.5);
+    }, 50);
+    return () => clearInterval(interval);
+  }, [searchHighlightId]);
+
   /**
    * 添加柜机时，将新柜机放在画布可见区域的中心位置
    */
@@ -291,7 +309,37 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
         scale: stageConfig.scale,
       });
     },
-  }), [getCanvasCenter, getEntryCenteredConfig, cabinets, containerSize, stageConfig.scale]);
+    zoomIn: () => {
+      const centerX = containerSize.width / 2;
+      const centerY = containerSize.height / 2;
+      const oldScale = stageConfig.scale;
+      const newScale = Math.min(3, oldScale + 0.1);
+      const mousePointTo = {
+        x: (centerX - stageConfig.x) / oldScale,
+        y: (centerY - stageConfig.y) / oldScale,
+      };
+      setStageConfig({
+        scale: newScale,
+        x: centerX - mousePointTo.x * newScale,
+        y: centerY - mousePointTo.y * newScale,
+      });
+    },
+    zoomOut: () => {
+      const centerX = containerSize.width / 2;
+      const centerY = containerSize.height / 2;
+      const oldScale = stageConfig.scale;
+      const newScale = Math.max(0.2, oldScale - 0.1);
+      const mousePointTo = {
+        x: (centerX - stageConfig.x) / oldScale,
+        y: (centerY - stageConfig.y) / oldScale,
+      };
+      setStageConfig({
+        scale: newScale,
+        x: centerX - mousePointTo.x * newScale,
+        y: centerY - mousePointTo.y * newScale,
+      });
+    },
+  }), [getCanvasCenter, getEntryCenteredConfig, cabinets, containerSize, stageConfig]);
 
   /**
    * 滚轮缩放事件处理
@@ -678,7 +726,8 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             const h = cabinet.height || CABINET_DEFAULT_HEIGHT;
 
             // 选中时的发光效果（使用阴影模拟）
-            const shadowBlur = isSelected ? 15 : isSearchHighlight ? 20 : isMultiSelected ? 10 : 0;
+            const pulseBlur = isSearchHighlight ? 20 + searchPulsePhase * 15 : 0;
+            const shadowBlur = isSelected ? 15 : pulseBlur > 0 ? pulseBlur : isMultiSelected ? 10 : 0;
             const shadowColor = isSelected
               ? SELECTED_BORDER_COLOR
               : isSearchHighlight
@@ -692,6 +741,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             const cabStrokeW = cabinet.strokeWidth || 2;
 
             // 选中时的发光边框
+            const searchBorderW = isSearchHighlight ? 4 : 3;
             const strokeColor = isSelected
               ? SELECTED_BORDER_COLOR
               : isSearchHighlight
@@ -699,7 +749,18 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
               : isMultiSelected
               ? '#8b5cf6'
               : cabStroke;
-            const strokeWidth = isSelected || isSearchHighlight ? 3 : isMultiSelected ? 3 : cabStrokeW;
+            const strokeWidth = isSelected ? 3 : isSearchHighlight ? searchBorderW : isMultiSelected ? 3 : cabStrokeW;
+
+            // 柜机名称可见性：根据缩放级别动态控制
+            const isMobile = containerSize.width < 768;
+            let showName = true;
+            if (isSelected || isSearchHighlight) {
+              showName = true;
+            } else if (isMobile) {
+              showName = stageConfig.scale >= 1.0;
+            } else {
+              showName = stageConfig.scale >= 0.8;
+            }
 
             // 使用拖拽缓存位置（如果有），避免重绘闪烁
             const draggedPos = draggedPositionsRef.current.get(cabinet.id);
@@ -739,12 +800,64 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   const node = e.target;
                   let newX = node.x();
                   let newY = node.y();
-                  // 自动吸附：靠近网格线时吸附到最近网格交点
-                  const snapThreshold = 10;
-                  const snapX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
-                  const snapY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
-                  if (Math.abs(newX - snapX) < snapThreshold) newX = snapX;
-                  if (Math.abs(newY - snapY) < snapThreshold) newY = snapY;
+                  const evt = e.evt as MouseEvent;
+                  const snapDisabled = evt.ctrlKey || evt.shiftKey;
+                  if (!snapDisabled) {
+                    const w = cabinet.width || CABINET_DEFAULT_WIDTH;
+                    const h = cabinet.height || CABINET_DEFAULT_HEIGHT;
+                    const snapThreshold = 10;
+                    const myLeft = newX;
+                    const myRight = newX + w;
+                    const myCenterX = newX + w / 2;
+                    const myTop = newY;
+                    const myBottom = newY + h;
+                    const myCenterY = newY + h / 2;
+                    let bestSnapX = newX;
+                    let bestSnapY = newY;
+                    let minDistX = snapThreshold + 1;
+                    let minDistY = snapThreshold + 1;
+                    for (const other of cabinets) {
+                      if (other.id === cabinet.id) continue;
+                      const ow = other.width || CABINET_DEFAULT_WIDTH;
+                      const oh = other.height || CABINET_DEFAULT_HEIGHT;
+                      const oLeft = other.x;
+                      const oRight = other.x + ow;
+                      const oCenterX = other.x + ow / 2;
+                      const oTop = other.y;
+                      const oBottom = other.y + oh;
+                      const oCenterY = other.y + oh / 2;
+                      const hSnaps = [
+                        { my: myLeft, other: oLeft },
+                        { my: myLeft, other: oRight },
+                        { my: myRight, other: oLeft },
+                        { my: myRight, other: oRight },
+                        { my: myCenterX, other: oCenterX },
+                      ];
+                      for (const snap of hSnaps) {
+                        const dist = Math.abs(snap.my - snap.other);
+                        if (dist < minDistX) {
+                          minDistX = dist;
+                          bestSnapX = newX + (snap.other - snap.my);
+                        }
+                      }
+                      const vSnaps = [
+                        { my: myTop, other: oTop },
+                        { my: myTop, other: oBottom },
+                        { my: myBottom, other: oTop },
+                        { my: myBottom, other: oBottom },
+                        { my: myCenterY, other: oCenterY },
+                      ];
+                      for (const snap of vSnaps) {
+                        const dist = Math.abs(snap.my - snap.other);
+                        if (dist < minDistY) {
+                          minDistY = dist;
+                          bestSnapY = newY + (snap.other - snap.my);
+                        }
+                      }
+                    }
+                    newX = bestSnapX;
+                    newY = bestSnapY;
+                  }
                   node.position({ x: newX, y: newY });
                   draggedPositionsRef.current.set(cabinet.id, { x: newX, y: newY });
                   onCabinetDragEnd(cabinet.id, newX, newY);
@@ -789,11 +902,12 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   width={w}
                   height={h}
                   text={`${getCabinetBrand(cabinet, tags)}${cabinet.name}`}
-                  fontSize={14}
+                  fontSize={isSearchHighlight ? 16 : 14}
                   fontStyle="bold"
-                  fill="#1e293b"
+                  fill={isSearchHighlight ? '#22c55e' : '#1e293b'}
                   align="center"
                   verticalAlign="middle"
+                  visible={showName}
                 />
                 {/* 筛选匹配绿点标记 */}
                 {isFilterActive && filterMatch && (
@@ -950,11 +1064,14 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
           font-size: 11px;
           font-weight: 700;
           color: #64748b;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-        .compass-n { top: 4px; left: 50%; transform: translateX(-50%); color: #ef4444; }
-        .compass-e { right: 4px; top: 50%; transform: translateY(-50%); }
-        .compass-s { bottom: 4px; left: 50%; transform: translateX(-50%); }
-        .compass-w { left: 4px; top: 50%; transform: translateY(-50%); }
+        .compass-n { top: 2px; left: 50%; transform: translateX(-50%); color: #ef4444; }
+        .compass-e { right: 2px; top: 50%; transform: translateY(-50%); }
+        .compass-s { bottom: 2px; left: 50%; transform: translateX(-50%); }
+        .compass-w { left: 2px; top: 50%; transform: translateY(-50%); }
         .compass-needle {
           position: absolute;
           top: 50%;

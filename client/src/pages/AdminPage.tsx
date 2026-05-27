@@ -28,6 +28,7 @@ import {
   deleteAutoBackups,
   createTag,
   deleteTag as apiDeleteTag,
+  updateTag as apiUpdateTag,
   createZone,
   updateZone,
   deleteZone as apiDeleteZone,
@@ -121,6 +122,10 @@ const AdminPage: React.FC = () => {
   const [newTagName, setNewTagName] = useState<string>('');
   const [newTagColor, setNewTagColor] = useState<string>('#3b82f6');
   const [newTagCategory, setNewTagCategory] = useState<string>('custom');
+
+  // 编辑标签颜色
+  const [editingTagColor, setEditingTagColor] = useState<string>('');
+  const [editingTagId, setEditingTagId] = useState<string>('');
 
   // 添加区域
   const [showAddZone, setShowAddZone] = useState<boolean>(false);
@@ -282,8 +287,21 @@ const AdminPage: React.FC = () => {
       setNewTagName('');
       const t = await getTags();
       setAllTags(t);
+      window.dispatchEvent(new CustomEvent('tag-updated'));
     } catch (err: any) {
       toast('添加标签失败: ' + err.message, 'error');
+    }
+  };
+
+  const handleUpdateTagColor = async (id: string, color: string) => {
+    try {
+      await apiUpdateTag(id, { color });
+      setAllTags((prev) => prev.map((t) => (t.id === id ? { ...t, color } : t)));
+      setEditingTagId('');
+      setEditingTagColor('');
+      window.dispatchEvent(new CustomEvent('tag-updated'));
+    } catch (err: any) {
+      toast('更新标签失败: ' + err.message, 'error');
     }
   };
 
@@ -292,6 +310,7 @@ const AdminPage: React.FC = () => {
     try {
       await apiDeleteTag(id);
       setAllTags((prev) => prev.filter((t) => t.id !== id));
+      window.dispatchEvent(new CustomEvent('tag-updated'));
     } catch (err: any) {
       toast('删除标签失败: ' + err.message, 'error');
     }
@@ -648,12 +667,38 @@ const AdminPage: React.FC = () => {
               {allTags.map((tag) => (
                 <div key={tag.id} className="tag-item">
                   <span className="tag-dot" style={{ background: tag.color }} />
-                  <span className="tag-name">{tag.name}</span>
-                  <span className="tag-category">{tag.category === 'courier' ? '快递' : tag.category === 'brand' ? '品牌' : '自定义'}</span>
-                  {tag.category === 'custom' && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteTag(tag.id)}>
-                      <Trash2 size={12} />
-                    </button>
+                  {editingTagId === tag.id ? (
+                    <div className="tag-color-edit">
+                      <input
+                        type="color"
+                        value={editingTagColor}
+                        onChange={(e) => setEditingTagColor(e.target.value)}
+                        className="color-picker-small"
+                      />
+                      <button className="btn btn-ghost btn-sm" onClick={() => handleUpdateTagColor(tag.id, editingTagColor)}>
+                        <Save size={12} />
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setEditingTagId(''); setEditingTagColor(''); }}>
+                        &times;
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="tag-name">{tag.name}</span>
+                      <span className="tag-category">{tag.category === 'courier' ? '快递' : tag.category === 'brand' ? '品牌' : '自定义'}</span>
+                      <input
+                        type="color"
+                        value={tag.color}
+                        onChange={(e) => { setEditingTagId(tag.id); setEditingTagColor(e.target.value); }}
+                        className="color-picker-tiny"
+                        title="编辑颜色"
+                      />
+                      {tag.category === 'custom' && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteTag(tag.id)}>
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
@@ -1052,6 +1097,28 @@ const AdminPage: React.FC = () => {
           border: 1px solid var(--color-border);
           border-radius: var(--radius-sm);
           cursor: pointer;
+        }
+        .color-picker-tiny {
+          width: 22px;
+          height: 22px;
+          padding: 1px;
+          border: 1px solid var(--color-border);
+          border-radius: 4px;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .color-picker-small {
+          width: 28px;
+          height: 28px;
+          padding: 1px;
+          border: 1px solid var(--color-border);
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .tag-color-edit {
+          display: flex;
+          align-items: center;
+          gap: 4px;
         }
         .tag-category-select {
           padding: 6px 8px;

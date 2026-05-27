@@ -2,6 +2,12 @@
 #   快递柜可视化地图管理系统 - 部署脚本
 #   支持 Windows (PowerShell 5+)
 #
+#   kd 快捷命令配置（Windows PowerShell）：
+#     以管理员身份运行 PowerShell，执行：
+#     if (!(Test-Path $PROFILE)) { New-Item -Path $PROFILE -Force }
+#     Add-Content -Path $PROFILE -Value 'function kd { & "E:\trae项目\快递柜\deploy.ps1" }'
+#     然后重启 PowerShell，输入 kd 即可运行此脚本。
+#
 #   最简单的方式（无需此脚本）：
 #     git clone https://github.com/stilesloveland-cyber/maps-kd.git
 #     cd maps-kd

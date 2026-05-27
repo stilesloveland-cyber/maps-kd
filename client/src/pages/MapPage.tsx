@@ -118,6 +118,14 @@ const MapPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const handleTagUpdated = () => {
+      loadData();
+    };
+    window.addEventListener('tag-updated', handleTagUpdated);
+    return () => window.removeEventListener('tag-updated', handleTagUpdated);
+  }, [loadData]);
+
   // ==================== 柜机操作 ====================
 
   /**
@@ -449,13 +457,11 @@ const MapPage: React.FC = () => {
    * 缩放控制
    */
   const handleZoomIn = useCallback(() => {
-    // 缩放由 MapCanvas 内部处理，此处通过 ref 或 event 触发
-    // 这里简化处理，直接触发 wheel 事件
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: '+' }));
+    mapCanvasRef.current?.zoomIn();
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: '-' }));
+    mapCanvasRef.current?.zoomOut();
   }, []);
 
   const handleResetView = useCallback(() => {
