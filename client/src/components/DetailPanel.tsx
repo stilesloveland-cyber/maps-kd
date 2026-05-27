@@ -35,6 +35,8 @@ interface DetailPanelProps {
   onUpdateZone: (id: string, zoneId: string | null) => Promise<void>;
   /** 删除柜机回调 */
   onDeleteCabinet: (id: string) => Promise<void>;
+  /** 更新柜机样式回调 */
+  onUpdateStyle?: (id: string, style: { followTagColor?: boolean; strokeColor?: string; strokeWidth?: number; strokeStyle?: 'solid' | 'dashed' }) => Promise<void>;
 }
 
 /**
@@ -309,6 +311,43 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         )}
       </div>
 
+      {/* 边框样式设置 */}
+      {isAuthenticated && (
+        <div className="detail-section">
+          <div className="detail-section-title">
+            <Layers size={14} />
+            外观样式
+          </div>
+          <div className="style-row">
+            <label className="style-label">跟随标签颜色</label>
+            <input type="checkbox" checked={cabinet.followTagColor !== false} onChange={(e) => {
+              onUpdateStyle?.(cabinet.id, { followTagColor: e.target.checked });
+            }} />
+          </div>
+          <div className="style-row">
+            <label className="style-label">边框颜色</label>
+            <input type="color" className="style-color" value={cabinet.strokeColor || '#94a3b8'} onChange={(e) => {
+              onUpdateStyle?.(cabinet.id, { strokeColor: e.target.value });
+            }} />
+          </div>
+          <div className="style-row">
+            <label className="style-label">边框宽度</label>
+            <input type="number" className="style-number" min={0} max={6} value={cabinet.strokeWidth || 2} onChange={(e) => {
+              onUpdateStyle?.(cabinet.id, { strokeWidth: Number(e.target.value) });
+            }} />
+          </div>
+          <div className="style-row">
+            <label className="style-label">边框样式</label>
+            <select className="style-select" value={cabinet.strokeStyle || 'solid'} onChange={(e) => {
+              onUpdateStyle?.(cabinet.id, { strokeStyle: e.target.value as 'solid' | 'dashed' });
+            }}>
+              <option value="solid">实线</option>
+              <option value="dashed">虚线</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* 删除操作 */}
       {isAuthenticated && (
         <div className="detail-section detail-delete-section">
@@ -478,6 +517,38 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
           padding-top: 20px;
           padding-bottom: 20px;
           border-bottom: none;
+        }
+        .style-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 4px 0;
+        }
+        .style-label {
+          font-size: 13px;
+          color: var(--color-text-secondary);
+        }
+        .style-color {
+          width: 32px;
+          height: 28px;
+          padding: 1px;
+          border: 1px solid var(--color-border);
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .style-number {
+          width: 52px;
+          padding: 4px 6px;
+          border: 1px solid var(--color-border);
+          border-radius: 4px;
+          font-size: 13px;
+          text-align: center;
+        }
+        .style-select {
+          padding: 4px 8px;
+          border: 1px solid var(--color-border);
+          border-radius: 4px;
+          font-size: 13px;
         }
       `}</style>
     </div>

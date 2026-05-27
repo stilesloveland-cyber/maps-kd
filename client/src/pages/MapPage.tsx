@@ -275,6 +275,30 @@ const MapPage: React.FC = () => {
   }, [toast]);
 
   /**
+   * 注释拖拽结束更新位置
+   */
+  const handleAnnotationDragEnd = useCallback(async (id: string, x: number, y: number) => {
+    try {
+      const updated = await updateAnnotation(id, { x, y });
+      setAnnotations((prev) => prev.map((a) => a.id === id ? updated : a));
+    } catch {
+      // 静默失败
+    }
+  }, []);
+
+  /**
+   * 更新柜机样式
+   */
+  const handleUpdateStyle = useCallback(async (id: string, style: { followTagColor?: boolean; strokeColor?: string; strokeWidth?: number; strokeStyle?: 'solid' | 'dashed' }) => {
+    try {
+      const updated = await updateCabinet(id, style);
+      setCabinets((prev) => prev.map((c) => c.id === id ? { ...c, ...updated } : c));
+    } catch (err) {
+      toast('更新样式失败: ' + (err as Error).message, 'error');
+    }
+  }, [toast]);
+
+  /**
    * 更新柜机名称
    */
   const handleUpdateName = useCallback(async (id: string, name: string) => {
@@ -566,6 +590,7 @@ const MapPage: React.FC = () => {
           onToggleSelect={handleToggleSelect}
           annotations={annotations}
           onAnnotationClick={handleAnnotationClick}
+          onAnnotationDragEnd={handleAnnotationDragEnd}
           entrySize={40}
           entryLabel="驿站入口"
           entryColor="#3b82f6"
@@ -592,6 +617,7 @@ const MapPage: React.FC = () => {
                 onUpdateTags={handleUpdateTags}
                 onUpdateZone={handleUpdateZone}
                 onDeleteCabinet={handleDeleteCabinet}
+                onUpdateStyle={handleUpdateStyle}
               />
             </div>
           )}
@@ -660,7 +686,7 @@ const MapPage: React.FC = () => {
           display: flex;
           flex-direction: column;
           flex-shrink: 0;
-          overflow: hidden;
+          overflow-y: auto;
         }
         .side-panels .filter-panel,
         .side-panels .detail-panel {

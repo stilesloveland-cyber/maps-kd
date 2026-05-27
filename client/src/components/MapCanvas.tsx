@@ -91,6 +91,8 @@ interface MapCanvasProps {
   onToggleSelect?: (cabinetId: string) => void;
   /** 注释点击回调 */
   onAnnotationClick?: (annotation: Annotation) => void;
+  /** 注释拖拽结束回调 */
+  onAnnotationDragEnd?: (id: string, x: number, y: number) => void;
   /** 驿站入口大小 */
   entrySize?: number;
   /** 驿站入口文字 */
@@ -153,6 +155,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   selectedIds,
   onToggleSelect,
   onAnnotationClick,
+  onAnnotationDragEnd,
   entrySize = 40,
   entryLabel = '驿站入口',
   entryColor = '#3b82f6',
@@ -540,7 +543,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             const zoneStrokeW = isZoneSelected ? 3 : (zone.strokeWidth || 2);
             const zoneDash = zone.strokeStyle === 'dashed' ? [10, 5] : undefined;
             return (
-              <Group key={zone.id} ref={(node) => { if (node && !node.isCached()) node.cache(); }}>
+              <Group key={zone.id}>
                 {/* 区域底色 */}
                 <Rect
                   x={zone.x}
@@ -863,7 +866,12 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
               key={ann.id}
               x={ann.x}
               y={ann.y}
-              draggable={false}
+              draggable
+              onDragStart={() => { zoneDraggingRef.current = true; }}
+              onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
+                zoneDraggingRef.current = false;
+                onAnnotationDragEnd?.(ann.id, e.target.x(), e.target.y());
+              }}
               onClick={() => onAnnotationClick?.(ann)}
               onTap={() => onAnnotationClick?.(ann)}
             >
