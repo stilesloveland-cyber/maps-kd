@@ -51,6 +51,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   onUpdateTags,
   onUpdateZone,
   onDeleteCabinet,
+  onUpdateStyle,
 }) => {
   const { isAuthenticated } = useAuth();
   const [editingName, setEditingName] = useState<boolean>(false);
