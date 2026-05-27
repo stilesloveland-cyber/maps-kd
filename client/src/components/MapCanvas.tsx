@@ -556,7 +556,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   draggable={isAuthenticated}
                   onClick={() => { setSelectedZoneId(zone.id); onSelectCabinet(null); }}
                   onTap={() => { setSelectedZoneId(zone.id); onSelectCabinet(null); }}
-                  onDragEnd={(e) => {
+                  onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
                     onZoneDragEnd(zone.id, e.target.x(), e.target.y());
                   }}
                 />
@@ -580,7 +580,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                         strokeWidth={1}
                         cornerRadius={2}
                         draggable
-                        onDragMove={(e) => {
+                        onDragMove={(e: Konva.KonvaEventObject<DragEvent>) => {
                           const nx = e.target.x();
                           const ny = e.target.y();
                           let newX = zone.x, newY = zone.y, newW = zone.width, newH = zone.height;
@@ -656,16 +656,16 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                 height={h}
                 opacity={opacity}
                 draggable={isAuthenticated && !isFilterActive}
-                onClick={(e) => {
+                onClick={(e: Konva.KonvaEventObject<MouseEvent>) => {
                   e.cancelBubble = true;
                   if (isDraggingRef.current) return;
                   onSelectCabinet(cabinet.id);
                 }}
-                onTap={(e) => {
+                onTap={(e: Konva.KonvaEventObject<TouchEvent>) => {
                   e.cancelBubble = true;
                   onSelectCabinet(cabinet.id);
                 }}
-                onDragEnd={(e) => {
+                onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
                   const node = e.target;
                   const newX = node.x();
                   const newY = node.y();
