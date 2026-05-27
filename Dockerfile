@@ -2,8 +2,8 @@
 FROM node:18-alpine AS builder
 
 WORKDIR /app/client
-COPY client/package.json client/package-lock.json* ./
-RUN npm ci
+COPY client/package.json ./
+RUN npm install
 
 COPY client/ .
 RUN npm run build
@@ -12,8 +12,8 @@ RUN npm run build
 FROM node:18-alpine AS server-builder
 
 WORKDIR /app/server
-COPY server/package.json server/package-lock.json* ./
-RUN npm ci
+COPY server/package.json ./
+RUN npm install
 
 COPY server/ .
 RUN npx tsc
