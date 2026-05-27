@@ -48,6 +48,24 @@ sudo docker compose up -d
 | `http://localhost:3000/admin` | 后台管理 |
 | `http://localhost:3000/api-docs` | API 接口文档 |
 
+### 更新代码后重启
+
+修改代码后，在服务器上拉取并重新构建：
+
+```bash
+cd ~/maps-kd
+git pull
+sudo docker compose up -d --build
+```
+
+> `--build` 会增量构建，只重新编译有变化的部分，未改动的层使用缓存，速度很快。
+> 
+> 只有修改了 `Dockerfile` 或 `package.json` 时，才需要加 `--no-cache` 完全重建：
+> ```bash
+> sudo docker compose build --no-cache
+> sudo docker compose up -d
+> ```
+
 ### 方式二：本地开发
 
 **要求：** Node.js 18+

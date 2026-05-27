@@ -19,7 +19,7 @@ import {
   updateCabinetTags,
 } from '../api';
 import Toolbar from '../components/Toolbar';
-import MapCanvas from '../components/MapCanvas';
+import MapCanvas, { MapCanvasRef } from '../components/MapCanvas';
 import FilterPanel from '../components/FilterPanel';
 import DetailPanel from '../components/DetailPanel';
 import LoginModal from '../components/LoginModal';
@@ -67,6 +67,9 @@ const MapPage: React.FC = () => {
   // 用于触发添加柜机的坐标
   const addPositionRef = useRef<{ x: number; y: number } | null>(null);
 
+  // MapCanvas 的 ref，用于获取视图中心位置
+  const mapCanvasRef = useRef<MapCanvasRef>(null);
+
   // ==================== 数据加载 ====================
 
   /**
@@ -106,9 +109,13 @@ const MapPage: React.FC = () => {
     const newNumber = generateNumber(cabinets);
     const newName = `${newNumber}号柜`;
 
-    // 默认放置位置（画布中心偏左）
-    const centerX = 800 + Math.random() * 200;
-    const centerY = 500 + Math.random() * 200;
+    // 获取当前视图中心对应的画布坐标
+    const center = mapCanvasRef.current
+      ? mapCanvasRef.current.getCanvasCenter()
+      : { x: 800, y: 500 };
+    // 加一点随机偏移，避免重叠
+    const centerX = center.x + (Math.random() - 0.5) * 100;
+    const centerY = center.y + (Math.random() - 0.5) * 100;
 
     try {
       const newCabinet = await createCabinet({
@@ -186,6 +193,9 @@ const MapPage: React.FC = () => {
   const handleCabinetDragEnd = useCallback(async (cabinetId: string, x: number, y: number) => {
     try {
       await updateCabinetPosition(cabinetId, { x, y });
+      setCabinets((prev) =>
+        prev.map((c) => (c.id === cabinetId ? { ...c, x, y } : c))
+      );
     } catch (err) {
       console.error('更新柜机位置失败:', err);
     }
@@ -291,6 +301,7 @@ const MapPage: React.FC = () => {
       <div className="main-content">
         {/* 画布 */}
         <MapCanvas
+          ref={mapCanvasRef}
           cabinets={cabinets}
           zones={zones}
           selectedCabinetId={selectedCabinetId}

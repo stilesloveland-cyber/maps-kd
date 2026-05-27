@@ -11,7 +11,7 @@
  * - 触屏支持：单指拖动、双指缩放
  * - 拖拽柜机移动（管理员已登录时）
  */
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import Konva from 'konva';
 import type { Cabinet, Zone } from '../types';
@@ -95,9 +95,14 @@ const generateGridLines = (width: number, height: number) => {
   return lines;
 };
 
+/** MapCanvas 暴露给父组件的方法 */
+export interface MapCanvasRef {
+  getCanvasCenter: () => { x: number; y: number };
+}
+
 // ---------- 组件 ----------
 
-const MapCanvas: React.FC<MapCanvasProps> = ({
+const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   cabinets,
   zones,
   selectedCabinetId,
@@ -107,7 +112,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   onCabinetDragEnd,
   addPosition,
   onClickEmpty,
-}) => {
+}, ref) => {
   const { isAuthenticated } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -197,6 +202,11 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       y: (centerY - stageConfig.y) / stageConfig.scale,
     };
   }, [containerSize, stageConfig]);
+
+  // 通过 ref 暴露 getCanvasCenter 方法给父组件
+  useImperativeHandle(ref, () => ({
+    getCanvasCenter,
+  }), [getCanvasCenter]);
 
   /**
    * 滚轮缩放事件处理
