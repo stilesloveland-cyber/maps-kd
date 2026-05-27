@@ -15,6 +15,10 @@ export interface Cabinet {
   tags: string[];
   zoneId: string | null;
   color: string;
+  followTagColor: boolean;
+  strokeColor: string;
+  strokeWidth: number;
+  strokeStyle: 'solid' | 'dashed';
   createdAt: string;
   updatedAt: string;
 }
@@ -36,6 +40,10 @@ export interface Zone {
   y: number;
   width: number;
   height: number;
+  fillEnabled: boolean;
+  strokeColor: string;
+  strokeWidth: number;
+  strokeStyle: 'solid' | 'dashed';
   createdAt: string;
   updatedAt: string;
 }
@@ -128,6 +136,10 @@ export interface UpdateCabinetRequest {
   number?: string;
   color?: string;
   zoneId?: string | null;
+  followTagColor?: boolean;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeStyle?: string;
 }
 
 /** 更新柜机位置请求 */
@@ -160,6 +172,10 @@ export interface CreateZoneRequest {
   y: number;
   width: number;
   height: number;
+  fillEnabled?: boolean;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeStyle?: string;
 }
 
 /** 更新区域请求 */
@@ -170,10 +186,47 @@ export interface UpdateZoneRequest {
   y?: number;
   width?: number;
   height?: number;
+  fillEnabled?: boolean;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeStyle?: string;
 }
 
 /** 修改密码请求 */
 export interface ChangePasswordRequest {
   oldPassword: string;
   newPassword: string;
+}
+
+/** 标注数据模型 */
+export interface Annotation {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  textColor: string;
+  bgColor: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 创建标注请求 */
+export interface CreateAnnotationRequest {
+  text: string;
+  x: number;
+  y: number;
+  fontSize?: number;
+  textColor?: string;
+  bgColor?: string;
+}
+
+/** 更新标注请求 */
+export interface UpdateAnnotationRequest {
+  text?: string;
+  x?: number;
+  y?: number;
+  fontSize?: number;
+  textColor?: string;
+  bgColor?: string;
 }

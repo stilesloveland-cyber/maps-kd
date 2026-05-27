@@ -19,6 +19,7 @@ import {
   MapPin,
   Database,
   Layers,
+  MessageSquare,
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -34,6 +35,8 @@ interface ToolbarProps {
   onAddCabinet: () => void;
   /** 批量生成柜机回调 */
   onBatchGenerate: () => void;
+  /** 添加注释回调 */
+  onAddAnnotation?: () => void;
   /** 添加区域回调 */
   onAddZone: () => void;
   /** 缩放回调 */
@@ -56,6 +59,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onSearchResult,
   onAddCabinet,
   onBatchGenerate,
+  onAddAnnotation,
   onAddZone,
   onZoomIn,
   onZoomOut,
@@ -190,6 +194,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <button className="btn btn-ghost btn-sm desktop-only" onClick={onBatchGenerate}>
             <Layers size={16} />
             <span className="btn-label">批量生成</span>
+          </button>
+        )}
+        {/* 添加注释按钮（需登录） */}
+        {isAuthenticated && onAddAnnotation && (
+          <button className="btn btn-ghost btn-sm desktop-only" onClick={onAddAnnotation}>
+            <MessageSquare size={16} />
+            <span className="btn-label">添加注释</span>
           </button>
         )}
         {/* 添加区域按钮（需登录） */}

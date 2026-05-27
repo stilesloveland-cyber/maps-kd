@@ -382,6 +382,101 @@
         "类型检查失败时阻止 commit，并提示具体错误",
         "对运行性能无影响（tsc --noEmit 通常 5-10 秒内完成）"
       ]
+    },
+    {
+      "id": "F025",
+      "name": "标签联动柜机颜色与边框样式",
+      "description": "柜机颜色跟随标签颜色自动同步，并可单独设置柜机和区域的边框颜色、宽度、样式（实线/虚线）。",
+      "acceptanceCriteria": [
+        "柜机添加标签后，自动使用该标签的颜色作为柜机底色（覆盖默认随机色）",
+        "柜机有多个标签时，优先使用选中/排序第一的标签颜色",
+        "柜机详情面板显示'跟随标签颜色'开关，关闭后可手动设置独立底色",
+        "柜机可设置边框颜色、边框宽度（1-6px）、边框样式（实线/虚线）",
+        "区域可设置边框颜色、边框宽度（1-6px）、边框样式（实线/虚线）",
+        "区域可开关内部填充颜色（开启时显示半透明底色，关闭时仅显示边框）",
+        "柜机和区域新增字段：strokeColor, strokeWidth, strokeStyle"
+      ]
+    },
+    {
+      "id": "F026",
+      "name": "柜机自动对齐（吸附）",
+      "description": "拖拽柜机时，靠近其他柜机边缘或网格线时自动吸附对齐，提高布局效率。",
+      "acceptanceCriteria": [
+        "拖拽柜机时，当柜机边缘或中心线靠近其他柜机边缘（10px以内）时自动吸附对齐",
+        "吸附参考线包括：其他柜机左右边缘、上下边缘、水平/垂直中心线",
+        "柜机靠近网格线（GRID_SIZE=50 的倍数）时也自动吸附",
+        "吸附时显示一条细蓝线作为对齐参考线",
+        "按住 Ctrl/Shift 键拖拽时临时关闭吸附功能",
+        "吸附仅在拖拽柜机时生效，不改变现有柜机位置"
+      ]
+    },
+    {
+      "id": "F027",
+      "name": "驿站入口增强与指南针",
+      "description": "驿站入口标记支持自定义大小和文字，地图右上角添加指南针指示方向。",
+      "acceptanceCriteria": [
+        "驿站入口标记可设置半径大小（默认40px，可调20-80px）",
+        "驿站入口标记下方可显示自定义文字（默认'驿站入口'，可修改）",
+        "驿站入口标记颜色可自定义",
+        "地图右上角显示指南针（圆形，N/S/E/W 四个方向标记）",
+        "指南针不随画布缩放改变大小，始终固定大小和位置"
+      ]
+    },
+    {
+      "id": "F028",
+      "name": "地图注释功能",
+      "description": "管理员可在画布上添加/编辑/删除文字注释，用于标记位置说明或提示信息。",
+      "acceptanceCriteria": [
+        "工具栏新增'添加注释'按钮（需登录），点击后在视图中心添加一个文字注释",
+        "注释在地图上显示为带背景框的文字标签",
+        "点击注释弹出编辑弹窗(AnnotationModal)，可修改文字内容、字体大小、文字颜色、背景色",
+        "注释弹窗使用 lucide-react X 图标关闭，三个按钮：删除(红色)、保存(蓝色)、取消",
+        "弹窗为居中圆角卡片样式，带背景遮罩和动画",
+        "注释数据存储在 annotations 表中",
+        "后端提供 annotations 的完整 CRUD API",
+        "注释支持删除"
+      ],
+      "frontendImplementation": {
+        "AnnotationModal": {
+          "file": "client/src/components/AnnotationModal.tsx",
+          "props": ["annotation: Annotation | null", "onSave: (data: CreateAnnotationRequest) => void", "onDelete: (id: string) => void", "onClose: () => void"],
+          "formFields": [
+            {"name": "text", "type": "textarea", "label": "文字内容"},
+            {"name": "fontSize", "type": "number", "label": "字体大小"},
+            {"name": "textColor", "type": "color", "label": "文字颜色"},
+            {"name": "bgColor", "type": "color", "label": "背景色"}
+          ],
+          "imports": ["React, useState, useEffect from 'react'", "lucide-react X 图标", "from '../types': Annotation, CreateAnnotationRequest"],
+          "styling": "内联CSS：居中弹窗，圆角卡片，背景遮罩，动画"
+        },
+        "MapPageUpdates": {
+          "newState": ["annotations: Annotation[]", "editingAnnotation: Annotation | null"],
+          "loadData": "在 useEffect loadData 中添加 getAnnotations() 调用",
+          "handlers": [
+            "handleAnnotationClick(ann): 设置 editingAnnotation",
+            "handleAnnotationSave(data): 创建或更新注释",
+            "handleAnnotationDelete(id): 删除注释",
+            "handleAddAnnotation: 在视图中心添加新注释"
+          ],
+          "MapCanvasProps": ["annotations", "onAnnotationClick", "entrySize={40}", "entryLabel=\"驿站入口\"", "entryColor=\"#3b82f6\""],
+          "toolbarButton": "在批量操作工具栏旁边添加'添加注释'按钮（仅登录后显示）"
+        },
+        "ToolbarUpdates": {
+          "newProps": ["onAddAnnotation?: () => void"],
+          "newButton": "在批量生成按钮后面添加'添加注释'按钮（仅登录后显示），图标用 MessageSquare"
+        }
+      }
+    },
+    {
+      "id": "F029",
+      "name": "区域拖拽/调整性能优化",
+      "description": "修复区域拖拽移动和四角调整大小时出现的卡顿问题。",
+      "acceptanceCriteria": [
+        "区域拖拽时实时更新位置不卡顿",
+        "四角调整手柄拖拽时尺寸变化平滑",
+        "区域渲染使用 Konva 缓存机制减少重绘",
+        "调整手柄的 onDragMove 事件处理优化，减少不必要的状态更新"
+      ]
     }
   ],
   "dataModel": {
@@ -397,6 +492,10 @@
         { "name": "tags", "type": "array<string>", "description": "标签ID列表" },
         { "name": "zoneId", "type": "string", "description": "所属区域ID（可为空）" },
         { "name": "color", "type": "string", "description": "柜机底色" },
+        { "name": "followTagColor", "type": "boolean", "description": "是否跟随标签颜色（默认true）" },
+        { "name": "strokeColor", "type": "string", "description": "边框颜色（默认#94a3b8）" },
+        { "name": "strokeWidth", "type": "number", "description": "边框宽度（默认2）" },
+        { "name": "strokeStyle", "type": "string", "description": "边框样式：solid/dashed（默认solid）" },
         { "name": "createdAt", "type": "string", "description": "创建时间" },
         { "name": "updatedAt", "type": "string", "description": "更新时间" }
       ]
@@ -414,6 +513,10 @@
         { "name": "id", "type": "string", "description": "唯一标识(UUID)" },
         { "name": "name", "type": "string", "description": "区域名称，如'A区'" },
         { "name": "color", "type": "string", "description": "区域颜色" },
+        { "name": "fillEnabled", "type": "boolean", "description": "是否显示内部填充颜色（默认true）" },
+        { "name": "strokeColor", "type": "string", "description": "边框颜色（默认区域color的深色版）" },
+        { "name": "strokeWidth", "type": "number", "description": "边框宽度（默认2）" },
+        { "name": "strokeStyle", "type": "string", "description": "边框样式：solid/dashed（默认dashed）" },
         { "name": "x", "type": "number", "description": "区域外框X坐标" },
         { "name": "y", "type": "number", "description": "区域外框Y坐标" },
         { "name": "width", "type": "number", "description": "区域外框宽度" },
@@ -461,6 +564,20 @@
       ]
     }
   },
+  "annotation": {
+    "description": "地图文字注释表，存储所有画布上的文字标注",
+    "fields": [
+      { "name": "id", "type": "string", "description": "唯一标识(UUID)" },
+      { "name": "text", "type": "string", "description": "注释文字内容" },
+      { "name": "x", "type": "number", "description": "画布X坐标" },
+      { "name": "y", "type": "number", "description": "画布Y坐标" },
+      { "name": "fontSize", "type": "number", "description": "字体大小（默认14）" },
+      { "name": "textColor", "type": "string", "description": "文字颜色（默认#1e293b）" },
+      { "name": "bgColor", "type": "string", "description": "背景色（默认#ffffff）" },
+      { "name": "createdAt", "type": "string", "description": "创建时间" },
+      { "name": "updatedAt", "type": "string", "description": "更新时间" }
+    ]
+  },
   "apiDesign": {
     "baseUrl": "/api",
     "endpoints": [
@@ -480,6 +597,10 @@
       { "method": "POST", "path": "/api/zones", "description": "创建新区域（需登录）" },
       { "method": "PUT", "path": "/api/zones/:id", "description": "更新区域信息/位置（需登录）" },
       { "method": "DELETE", "path": "/api/zones/:id", "description": "删除区域（需登录，区域内的柜机自动变为无区域）" },
+      { "method": "GET", "path": "/api/annotations", "description": "获取所有注释（公开）" },
+      { "method": "POST", "path": "/api/annotations", "description": "新增注释（需登录）" },
+      { "method": "PUT", "path": "/api/annotations/:id", "description": "更新注释（需登录）" },
+      { "method": "DELETE", "path": "/api/annotations/:id", "description": "删除注释（需登录）" },
       { "method": "POST", "path": "/api/auth/login", "description": "管理员登录" },
       { "method": "PUT", "path": "/api/auth/password", "description": "修改管理员密码（需登录）" },
       { "method": "GET", "path": "/api/auth/status", "description": "检查登录状态" },
@@ -496,14 +617,64 @@
       { "method": "GET", "path": "/api/cabinets/template", "description": "下载导入模板 .xlsx 文件（公开）" }
     ]
   },
+  "implementationPlan": {
+    "description": "后端数据库表扩展 + 新路由 + 现有路由字段扩展",
+    "steps": [
+      {
+        "step": 1,
+        "action": "更新 server/src/db.ts",
+        "details": [
+          "在 cabinets 表 CREATE TABLE 块之后，用 ALTER TABLE ADD COLUMN 方式（try-catch 容错）添加：followTagColor (INTEGER DEFAULT 1), strokeColor (TEXT DEFAULT '#94a3b8'), strokeWidth (REAL DEFAULT 2), strokeStyle (TEXT DEFAULT 'solid')",
+          "在 zones 表 CREATE TABLE 块之后，用 ALTER TABLE ADD COLUMN 方式添加：fillEnabled (INTEGER DEFAULT 1), strokeColor (TEXT DEFAULT '#4A90D9'), strokeWidth (REAL DEFAULT 2), strokeStyle (TEXT DEFAULT 'dashed')",
+          "在同个事务中创建 annotations 表：CREATE TABLE IF NOT EXISTS annotations (id TEXT PRIMARY KEY, text TEXT DEFAULT '', x REAL DEFAULT 0, y REAL DEFAULT 0, fontSize REAL DEFAULT 14, textColor TEXT DEFAULT '#1e293b', bgColor TEXT DEFAULT '#ffffff', createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL)"
+        ]
+      },
+      {
+        "step": 2,
+        "action": "创建 server/src/routes/annotations.ts",
+        "details": [
+          "完整 CRUD：GET / 返回所有注释（公开）",
+          "POST / 创建注释（authMiddleware，接收 text/x/y/fontSize/textColor/bgColor，uuid 生成 id）",
+          "PUT /:id 更新注释（authMiddleware）",
+          "DELETE /:id 删除注释（authMiddleware）"
+        ]
+      },
+      {
+        "step": 3,
+        "action": "更新 server/src/routes/cabinets.ts",
+        "details": [
+          "POST / 创建路由支持 followTagColor/strokeColor/strokeWidth/strokeStyle 新字段",
+          "PUT /:id 更新路由支持这些新字段",
+          "POST /batch 批量创建中也支持这些新字段"
+        ]
+      },
+      {
+        "step": 4,
+        "action": "更新 server/src/routes/zones.ts",
+        "details": [
+          "POST / 创建路由支持 fillEnabled/strokeColor/strokeWidth/strokeStyle 新字段",
+          "PUT /:id 更新路由支持这些新字段"
+        ]
+      },
+      {
+        "step": 5,
+        "action": "更新 server/src/index.ts",
+        "details": [
+          "导入 annotationsRoutes",
+          "注册 app.use('/api/annotations', annotationsRoutes)"
+        ]
+      }
+    ]
+  },
   "uiLayout": {
     "description": "响应式布局，桌面端为顶部工具栏+画布+侧边面板，移动端为抽屉式布局。后台管理为独立页面(/admin)。",
     "layoutSections": [
-      "顶部导航栏：应用标题 + 搜索框 + 添加柜机按钮 + 缩放控件 + 后台管理按钮（登录后显示）+ 数据版本号显示 + 登录/退出按钮",
-      "主区域（占据大部分空间）：Canvas画布（可拖拽+缩放，支持触屏）",
-      "右侧（桌面端）/底部抽屉（移动端）：标签筛选面板 + 柜机详情面板",
-      "底部：驿站入口参考标记（固定在画布坐标系中）",
-      "后台管理页面（/admin）：独立页面，集成概览统计、账户安全、操作日志、版本管理、标签管理、系统信息等功能卡片，顶部有面包屑导航"
+      "顶部导航栏：应用标题 + 搜索框 + 添加柜机按钮 + 批量生成按钮 + 多选按钮 + 添加注释按钮 + 添加区域按钮 + 缩放控件 + 后台管理按钮（登录后显示）+ 数据版本号显示 + 登录/退出按钮",
+      "主区域（占据大部分空间）：Canvas画布（可拖拽+缩放，支持触屏），右上角显示指南针",
+      "右侧（桌面端）/底部抽屉（移动端）：标签筛选面板 + 柜机详情面板（含边框样式/标签颜色开关）",
+      "底部：驿站入口参考标记（固定在画布坐标系中，可调大小和文字）",
+      "后台管理页面（/admin）：独立页面，集成概览统计、账户安全、操作日志、版本管理、标签管理、区域管理、导入导出、系统信息等功能卡片，顶部有面包屑导航",
+      "画布：支持注释文字标注（带背景框，可拖拽编辑），柜机拖拽时显示对齐参考线"
     ]
   }
 }

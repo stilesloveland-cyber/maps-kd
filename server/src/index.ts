@@ -17,6 +17,7 @@ import zoneRoutes from './routes/zones';
 import logRoutes from './routes/logs';
 import backupRoutes from './routes/backups';
 import statsRoutes from './routes/stats';
+import annotationRoutes from './routes/annotations';
 
 const app: Express = express();
 const PORT: number = parseInt(process.env.PORT || '3000', 10);
@@ -71,6 +72,7 @@ app.use('/api/zones', zoneRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/backups', backupRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/annotations', annotationRoutes);
 
 // ---- 前端静态文件托管 ----
 // 将 client/dist 目录下的前端构建文件作为静态资源提供服务

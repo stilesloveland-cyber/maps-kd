@@ -3,6 +3,7 @@
  * 统一处理所有后端接口调用，自动携带 JWT Token
  */
 import type {
+  Annotation,
   Cabinet,
   Tag,
   Zone,
@@ -23,6 +24,8 @@ import type {
   CreateZoneRequest,
   UpdateZoneRequest,
   ChangePasswordRequest,
+  CreateAnnotationRequest,
+  UpdateAnnotationRequest,
 } from '../types';
 
 // 获取存储的 JWT Token
@@ -292,3 +295,27 @@ export const downloadTemplate = async (): Promise<Blob> => {
 /** 获取系统元数据 */
 export const getSystemMeta = (): Promise<SystemMeta> =>
   request<SystemMeta>('/api/stats/meta');
+
+// ==================== 标注 API ====================
+
+/** 获取所有标注（需登录） */
+export const getAnnotations = (): Promise<Annotation[]> =>
+  request<Annotation[]>('/api/annotations');
+
+/** 创建标注（需登录） */
+export const createAnnotation = (data: CreateAnnotationRequest): Promise<Annotation> =>
+  request<Annotation>('/api/annotations', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+/** 更新标注（需登录） */
+export const updateAnnotation = (id: string, data: UpdateAnnotationRequest): Promise<Annotation> =>
+  request<Annotation>(`/api/annotations/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+
+/** 删除标注（需登录） */
+export const deleteAnnotation = (id: string): Promise<{ success: boolean }> =>
+  request<{ success: boolean }>(`/api/annotations/${id}`, { method: 'DELETE' });

@@ -334,9 +334,10 @@ router.get('/', (_req: Request, res: Response): void => {
  *         description: 参数错误
  */
 router.post('/', authMiddleware, (req: Request, res: Response): void => {
-  const { name, number, x, y, width, height, color, zoneId }: {
+  const { name, number, x, y, width, height, color, zoneId, followTagColor, strokeColor, strokeWidth, strokeStyle }: {
     name: string; number: string; x?: number; y?: number;
     width?: number; height?: number; color?: string; zoneId?: string;
+    followTagColor?: boolean; strokeColor?: string; strokeWidth?: number; strokeStyle?: string;
   } = req.body;
 
   if (!name || !name.trim() || !number || !number.trim()) {
@@ -364,15 +365,20 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
     tags: '[]',
     zoneId: zoneId || null,
     color: color || '#4A90D9',
+    followTagColor: followTagColor !== undefined ? (followTagColor ? 1 : 0) : 1,
+    strokeColor: strokeColor || '#94a3b8',
+    strokeWidth: strokeWidth ?? 2,
+    strokeStyle: strokeStyle || 'solid',
     createdAt: now,
     updatedAt: now,
   };
 
   db.prepare(
-    'INSERT INTO cabinets (id, name, number, x, y, width, height, tags, zoneId, color, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO cabinets (id, name, number, x, y, width, height, tags, zoneId, color, followTagColor, strokeColor, strokeWidth, strokeStyle, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(cabinetData.id, cabinetData.name, cabinetData.number, cabinetData.x, cabinetData.y,
     cabinetData.width, cabinetData.height, cabinetData.tags, cabinetData.zoneId,
-    cabinetData.color, cabinetData.createdAt, cabinetData.updatedAt);
+    cabinetData.color, cabinetData.followTagColor, cabinetData.strokeColor,
+    cabinetData.strokeWidth, cabinetData.strokeStyle, cabinetData.createdAt, cabinetData.updatedAt);
 
   incrementDataVersion();
   addLog('add_cabinet', `添加柜机 "${cabinetData.number} - ${cabinetData.name}"`, req.admin!.username);
@@ -666,8 +672,9 @@ router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
     return;
   }
 
-  const { name, number, color, width, height, zoneId }: {
+  const { name, number, color, width, height, zoneId, followTagColor, strokeColor, strokeWidth, strokeStyle }: {
     name?: string; number?: string; color?: string; width?: number; height?: number; zoneId?: string | null;
+    followTagColor?: boolean; strokeColor?: string; strokeWidth?: number; strokeStyle?: string;
   } = req.body;
 
   const now: string = new Date().toISOString();
@@ -678,13 +685,18 @@ router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
     width: width ?? existing.width,
     height: height ?? existing.height,
     zoneId: zoneId !== undefined ? zoneId : existing.zoneId,
+    followTagColor: followTagColor !== undefined ? (followTagColor ? 1 : 0) : existing.followTagColor,
+    strokeColor: strokeColor ?? existing.strokeColor,
+    strokeWidth: strokeWidth ?? existing.strokeWidth,
+    strokeStyle: strokeStyle ?? existing.strokeStyle,
     updatedAt: now,
   };
 
   db.prepare(
-    'UPDATE cabinets SET name = ?, number = ?, color = ?, width = ?, height = ?, zoneId = ?, updatedAt = ? WHERE id = ?'
+    'UPDATE cabinets SET name = ?, number = ?, color = ?, width = ?, height = ?, zoneId = ?, followTagColor = ?, strokeColor = ?, strokeWidth = ?, strokeStyle = ?, updatedAt = ? WHERE id = ?'
   ).run(updatedData.name, updatedData.number, updatedData.color, updatedData.width,
-    updatedData.height, updatedData.zoneId, updatedData.updatedAt, id);
+    updatedData.height, updatedData.zoneId, updatedData.followTagColor, updatedData.strokeColor,
+    updatedData.strokeWidth, updatedData.strokeStyle, updatedData.updatedAt, id);
 
   incrementDataVersion();
   addLog('edit_cabinet', `编辑柜机 "${updatedData.number}" 的信息`, req.admin!.username);

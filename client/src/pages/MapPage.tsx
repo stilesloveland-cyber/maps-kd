@@ -4,10 +4,10 @@
  * 负责数据加载、状态管理、业务逻辑编排
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Filter, Plus, Layers, Trash2, Move } from 'lucide-react';
+import { Filter, Plus, Layers, Trash2, Move, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import type { Cabinet, Tag as TagType, Zone, SystemMeta } from '../types';
+import type { Cabinet, Tag as TagType, Zone, SystemMeta, Annotation, CreateAnnotationRequest, UpdateAnnotationRequest } from '../types';
 import {
   getCabinets,
   getTags,
@@ -23,6 +23,10 @@ import {
   batchGenerateCabinets,
   batchDeleteCabinets,
   batchMoveCabinets,
+  getAnnotations,
+  createAnnotation,
+  updateAnnotation,
+  deleteAnnotation,
 } from '../api';
 import Toolbar from '../components/Toolbar';
 import MapCanvas, { MapCanvasRef } from '../components/MapCanvas';
@@ -30,6 +34,7 @@ import FilterPanel from '../components/FilterPanel';
 import DetailPanel from '../components/DetailPanel';
 import LoginModal from '../components/LoginModal';
 import BatchModal from '../components/BatchModal';
+import AnnotationModal from '../components/AnnotationModal';
 
 /**
  * 生成随机颜色
@@ -63,6 +68,7 @@ const MapPage: React.FC = () => {
   const [tags, setTags] = useState<TagType[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [systemMeta, setSystemMeta] = useState<SystemMeta>({ dataVersion: 0, appVersion: '1.0.0' });
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // ==================== UI 状态 ====================
@@ -74,6 +80,7 @@ const MapPage: React.FC = () => {
   const [showBatchModal, setShowBatchModal] = useState<boolean>(false);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
 
   // 用于触发添加柜机的坐标
   const addPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -88,16 +95,18 @@ const MapPage: React.FC = () => {
    */
   const loadData = useCallback(async () => {
     try {
-      const [cabs, tagList, zoneList, meta] = await Promise.all([
+      const [cabs, tagList, zoneList, meta, annotationsData] = await Promise.all([
         getCabinets(),
         getTags(),
         getZones(),
         getSystemMeta().catch(() => ({ dataVersion: 0, appVersion: '1.0.0' })),
+        getAnnotations(),
       ]);
       setCabinets(cabs);
       setTags(tagList);
       setZones(zoneList);
       setSystemMeta(meta);
+      setAnnotations(annotationsData);
     } catch (err) {
       console.error('加载数据失败:', err);
     } finally {
@@ -213,6 +222,57 @@ const MapPage: React.FC = () => {
       toast('批量移动失败: ' + (err as Error).message, 'error');
     }
   }, [isAuthenticated, selectedIds, zones, toast]);
+
+  /**
+   * 添加注释（在视图中心）
+   */
+  const handleAddAnnotation = useCallback(async () => {
+    if (!isAuthenticated) return;
+    const center = mapCanvasRef.current?.getCanvasCenter() || { x: 800, y: 500 };
+    try {
+      const newAnn = await createAnnotation({ text: '新注释', x: center.x, y: center.y });
+      setAnnotations((prev) => [...prev, newAnn]);
+      setEditingAnnotation(newAnn);
+    } catch (err) {
+      toast('添加注释失败: ' + (err as Error).message, 'error');
+    }
+  }, [isAuthenticated, toast]);
+
+  /**
+   * 点击注释编辑
+   */
+  const handleAnnotationClick = useCallback((ann: Annotation) => {
+    setEditingAnnotation(ann);
+  }, []);
+
+  /**
+   * 保存注释
+   */
+  const handleAnnotationSave = useCallback(async (data: CreateAnnotationRequest | UpdateAnnotationRequest) => {
+    if (!editingAnnotation) return;
+    try {
+      const updated = await updateAnnotation(editingAnnotation.id, data);
+      setAnnotations((prev) => prev.map((a) => a.id === editingAnnotation.id ? updated : a));
+      setEditingAnnotation(null);
+      toast('注释已保存', 'success');
+    } catch (err) {
+      toast('保存注释失败: ' + (err as Error).message, 'error');
+    }
+  }, [editingAnnotation, toast]);
+
+  /**
+   * 删除注释
+   */
+  const handleAnnotationDelete = useCallback(async (id: string) => {
+    try {
+      await deleteAnnotation(id);
+      setAnnotations((prev) => prev.filter((a) => a.id !== id));
+      setEditingAnnotation(null);
+      toast('注释已删除', 'success');
+    } catch (err) {
+      toast('删除注释失败: ' + (err as Error).message, 'error');
+    }
+  }, [toast]);
 
   /**
    * 更新柜机名称
@@ -420,6 +480,7 @@ const MapPage: React.FC = () => {
         onSearchResult={handleSearchResult}
         onAddCabinet={handleAddCabinet}
         onBatchGenerate={() => setShowBatchModal(true)}
+        onAddAnnotation={handleAddAnnotation}
         onAddZone={handleAddZone}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
@@ -457,14 +518,17 @@ const MapPage: React.FC = () => {
                 className="batch-zone-select"
                 value=""
                 onChange={(e) => {
-                  if (e.target.value) {
-                    handleBatchMove(e.target.value);
+                  const val = e.target.value;
+                  if (val === '__none__') {
+                    handleBatchMove(null);
+                  } else if (val) {
+                    handleBatchMove(val);
                   }
                 }}
                 disabled={selectedIds.size === 0}
               >
                 <option value="">移动到区域...</option>
-                <option value="">无区域</option>
+                <option value="__none__">无区域</option>
                 {zones.map((z) => (
                   <option key={z.id} value={z.id}>{z.name}</option>
                 ))}
@@ -500,6 +564,11 @@ const MapPage: React.FC = () => {
           isMultiSelectMode={isMultiSelectMode}
           selectedIds={selectedIds}
           onToggleSelect={handleToggleSelect}
+          annotations={annotations}
+          onAnnotationClick={handleAnnotationClick}
+          entrySize={40}
+          entryLabel="驿站入口"
+          entryColor="#3b82f6"
         />
 
         {/* 右侧面板区域（桌面端） */}
@@ -567,6 +636,16 @@ const MapPage: React.FC = () => {
           tags={tags}
           onConfirm={handleBatchGenerate}
           onClose={() => setShowBatchModal(false)}
+        />
+      )}
+
+      {/* 注释编辑弹窗 */}
+      {editingAnnotation !== null && (
+        <AnnotationModal
+          annotation={editingAnnotation}
+          onSave={handleAnnotationSave}
+          onDelete={handleAnnotationDelete}
+          onClose={() => setEditingAnnotation(null)}
         />
       )}
 

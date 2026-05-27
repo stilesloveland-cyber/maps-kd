@@ -69,8 +69,9 @@ router.get('/', (_req: Request, res: Response): void => {
  *         description: 参数错误
  */
 router.post('/', authMiddleware, (req: Request, res: Response): void => {
-  const { name, color, x, y, width, height }: {
+  const { name, color, x, y, width, height, fillEnabled, strokeColor, strokeWidth, strokeStyle }: {
     name: string; color?: string; x?: number; y?: number; width?: number; height?: number;
+    fillEnabled?: boolean; strokeColor?: string; strokeWidth?: number; strokeStyle?: string;
   } = req.body;
 
   if (!name || !name.trim()) {
@@ -83,6 +84,10 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
     id: uuidv4(),
     name: name.trim(),
     color: color || '#4A90D9',
+    fillEnabled: fillEnabled !== undefined ? (fillEnabled ? 1 : 0) : 1,
+    strokeColor: strokeColor || '#4A90D9',
+    strokeWidth: strokeWidth ?? 2,
+    strokeStyle: strokeStyle || 'dashed',
     x: x ?? 0,
     y: y ?? 0,
     width: width ?? 300,
@@ -93,8 +98,10 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
 
   const db = getDatabase();
   db.prepare(
-    'INSERT INTO zones (id, name, color, x, y, width, height, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(zoneData.id, zoneData.name, zoneData.color, zoneData.x, zoneData.y, zoneData.width, zoneData.height, zoneData.createdAt, zoneData.updatedAt);
+    'INSERT INTO zones (id, name, color, fillEnabled, strokeColor, strokeWidth, strokeStyle, x, y, width, height, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(zoneData.id, zoneData.name, zoneData.color, zoneData.fillEnabled, zoneData.strokeColor,
+    zoneData.strokeWidth, zoneData.strokeStyle, zoneData.x, zoneData.y, zoneData.width,
+    zoneData.height, zoneData.createdAt, zoneData.updatedAt);
 
   incrementDataVersion();
   addLog('create_zone', `创建区域 "${zoneData.name}"`, req.admin!.username);
@@ -154,14 +161,19 @@ router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
     return;
   }
 
-  const { name, color, x, y, width, height }: {
+  const { name, color, x, y, width, height, fillEnabled, strokeColor, strokeWidth, strokeStyle }: {
     name?: string; color?: string; x?: number; y?: number; width?: number; height?: number;
+    fillEnabled?: boolean; strokeColor?: string; strokeWidth?: number; strokeStyle?: string;
   } = req.body;
 
   const now: string = new Date().toISOString();
   const updatedData: Record<string, unknown> = {
     name: name ?? existing.name,
     color: color ?? existing.color,
+    fillEnabled: fillEnabled !== undefined ? (fillEnabled ? 1 : 0) : existing.fillEnabled,
+    strokeColor: strokeColor ?? existing.strokeColor,
+    strokeWidth: strokeWidth ?? existing.strokeWidth,
+    strokeStyle: strokeStyle ?? existing.strokeStyle,
     x: x ?? existing.x,
     y: y ?? existing.y,
     width: width ?? existing.width,
@@ -170,8 +182,10 @@ router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
   };
 
   db.prepare(
-    'UPDATE zones SET name = ?, color = ?, x = ?, y = ?, width = ?, height = ?, updatedAt = ? WHERE id = ?'
-  ).run(updatedData.name, updatedData.color, updatedData.x, updatedData.y, updatedData.width, updatedData.height, updatedData.updatedAt, id);
+    'UPDATE zones SET name = ?, color = ?, fillEnabled = ?, strokeColor = ?, strokeWidth = ?, strokeStyle = ?, x = ?, y = ?, width = ?, height = ?, updatedAt = ? WHERE id = ?'
+  ).run(updatedData.name, updatedData.color, updatedData.fillEnabled, updatedData.strokeColor,
+    updatedData.strokeWidth, updatedData.strokeStyle, updatedData.x, updatedData.y,
+    updatedData.width, updatedData.height, updatedData.updatedAt, id);
 
   incrementDataVersion();
   addLog('edit_zone', `更新区域 "${updatedData.name}" 的信息`, req.admin!.username);

@@ -121,9 +121,41 @@ export function initializeDatabase(): void {
         updatedAt TEXT NOT NULL
       )
     `);
+
+    // 注释表 annotations
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS annotations (
+        id TEXT PRIMARY KEY NOT NULL,
+        text TEXT NOT NULL DEFAULT '',
+        x REAL NOT NULL DEFAULT 0,
+        y REAL NOT NULL DEFAULT 0,
+        fontSize REAL NOT NULL DEFAULT 14,
+        textColor TEXT NOT NULL DEFAULT '#1e293b',
+        bgColor TEXT NOT NULL DEFAULT '#ffffff',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      )
+    `);
   });
 
   createTablesTransaction();
+
+  // ---- 为已有表添加新字段（兼容旧数据库） ----
+  const addColumnIfNotExists = (table: string, column: string, def: string) => {
+    try {
+      database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`);
+    } catch {
+      // 列已存在，忽略
+    }
+  };
+  addColumnIfNotExists('cabinets', 'followTagColor', 'INTEGER NOT NULL DEFAULT 1');
+  addColumnIfNotExists('cabinets', 'strokeColor', 'TEXT NOT NULL DEFAULT \'#94a3b8\'');
+  addColumnIfNotExists('cabinets', 'strokeWidth', 'REAL NOT NULL DEFAULT 2');
+  addColumnIfNotExists('cabinets', 'strokeStyle', 'TEXT NOT NULL DEFAULT \'solid\'');
+  addColumnIfNotExists('zones', 'fillEnabled', 'INTEGER NOT NULL DEFAULT 1');
+  addColumnIfNotExists('zones', 'strokeColor', 'TEXT NOT NULL DEFAULT \'#4A90D9\'');
+  addColumnIfNotExists('zones', 'strokeWidth', 'REAL NOT NULL DEFAULT 2');
+  addColumnIfNotExists('zones', 'strokeStyle', 'TEXT NOT NULL DEFAULT \'dashed\'');
 
   // ---- 插入预置标签数据（仅首次运行） ----
   const tagCountResult = database.prepare('SELECT COUNT(*) AS count FROM tags').get() as { count: number };

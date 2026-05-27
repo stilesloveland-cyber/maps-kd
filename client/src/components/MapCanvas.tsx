@@ -12,9 +12,9 @@
  * - 拖拽柜机移动（管理员已登录时）
  */
 import React, { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Line, Circle, Arrow } from 'react-konva';
 import Konva from 'konva';
-import type { Cabinet, Zone, Tag } from '../types';
+import type { Cabinet, Zone, Tag, Annotation } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 // ---------- 常量定义 ----------
@@ -63,6 +63,8 @@ interface MapCanvasProps {
   zones: Zone[];
   /** 标签列表 */
   tags: Tag[];
+  /** 注释列表 */
+  annotations?: Annotation[];
   /** 当前选中的柜机 ID */
   selectedCabinetId: string | null;
   /** 选中的标签 ID 列表（用于筛选高亮） */
@@ -87,6 +89,14 @@ interface MapCanvasProps {
   selectedIds?: Set<string>;
   /** 多选模式切换选中回调 */
   onToggleSelect?: (cabinetId: string) => void;
+  /** 注释点击回调 */
+  onAnnotationClick?: (annotation: Annotation) => void;
+  /** 驿站入口大小 */
+  entrySize?: number;
+  /** 驿站入口文字 */
+  entryLabel?: string;
+  /** 驿站入口颜色 */
+  entryColor?: string;
 }
 
 // ---------- 辅助函数 ----------
@@ -129,6 +139,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   cabinets,
   zones,
   tags,
+  annotations = [],
   selectedCabinetId,
   filterTagIds,
   searchHighlightId,
@@ -141,6 +152,10 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   isMultiSelectMode = false,
   selectedIds,
   onToggleSelect,
+  onAnnotationClick,
+  entrySize = 40,
+  entryLabel = '驿站入口',
+  entryColor = '#3b82f6',
 }, ref) => {
   const { isAuthenticated } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -520,26 +535,30 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
         <Layer>
           {zones.map((zone) => {
             const isZoneSelected = zone.id === selectedZoneId;
+            const zoneFill = zone.fillEnabled !== false ? (zone.color + '15') : 'transparent';
+            const zoneStroke = zone.strokeColor || zone.color;
+            const zoneStrokeW = isZoneSelected ? 3 : (zone.strokeWidth || 2);
+            const zoneDash = zone.strokeStyle === 'dashed' ? [10, 5] : undefined;
             return (
-              <Group key={zone.id}>
+              <Group key={zone.id} ref={(node) => { if (node && !node.isCached()) node.cache(); }}>
                 {/* 区域底色 */}
                 <Rect
                   x={zone.x}
                   y={zone.y}
                   width={zone.width}
                   height={zone.height}
-                  fill={zone.color + '15'}
+                  fill={zoneFill}
                   cornerRadius={4}
                 />
-                {/* 区域虚线边框 */}
+                {/* 区域边框 */}
                 <Rect
                   x={zone.x}
                   y={zone.y}
                   width={zone.width}
                   height={zone.height}
-                  stroke={isZoneSelected ? '#3b82f6' : zone.color}
-                  strokeWidth={isZoneSelected ? 3 : 2}
-                  dash={[10, 5]}
+                  stroke={isZoneSelected ? '#3b82f6' : zoneStroke}
+                  strokeWidth={zoneStrokeW}
+                  dash={zoneDash}
                   cornerRadius={4}
                 />
                 {/* 区域名称标签 */}
@@ -627,6 +646,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             const isSelected = cabinet.id === selectedCabinetId;
             const isSearchHighlight = cabinet.id === searchHighlightId;
             const filterMatch = isCabinetFilterMatch(cabinet);
+            const isMultiSelected = selectedIds?.has(cabinet.id) ?? false;
 
             // 计算透明度
             let opacity = 1;
@@ -636,6 +656,14 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
 
             // 柜机底色
             let fillColor = cabinet.color || CABINET_DEFAULT_COLOR;
+
+            // 如果开启跟随标签颜色，取第一个标签的颜色
+            if (cabinet.followTagColor !== false && cabinet.tags && cabinet.tags.length > 0) {
+              const firstTag = tags.find((t) => cabinet.tags.includes(t.id));
+              if (firstTag) {
+                fillColor = firstTag.color;
+              }
+            }
 
             // 筛选模式下，未匹配柜机变为灰色
             if (isFilterActive && !filterMatch) {
@@ -647,20 +675,28 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             const h = cabinet.height || CABINET_DEFAULT_HEIGHT;
 
             // 选中时的发光效果（使用阴影模拟）
-            const shadowBlur = isSelected ? 15 : isSearchHighlight ? 20 : 0;
+            const shadowBlur = isSelected ? 15 : isSearchHighlight ? 20 : isMultiSelected ? 10 : 0;
             const shadowColor = isSelected
               ? SELECTED_BORDER_COLOR
               : isSearchHighlight
               ? '#22c55e'
+              : isMultiSelected
+              ? '#8b5cf6'
               : 'transparent';
+
+            // 柜机静态边框（非选中/高亮状态使用自定义设置）
+            const cabStroke = cabinet.strokeColor || '#94a3b8';
+            const cabStrokeW = cabinet.strokeWidth || 2;
 
             // 选中时的发光边框
             const strokeColor = isSelected
               ? SELECTED_BORDER_COLOR
               : isSearchHighlight
               ? '#22c55e'
-              : 'transparent';
-            const strokeWidth = isSelected || isSearchHighlight ? 3 : 0;
+              : isMultiSelected
+              ? '#8b5cf6'
+              : cabStroke;
+            const strokeWidth = isSelected || isSearchHighlight ? 3 : isMultiSelected ? 3 : cabStrokeW;
 
             // 使用拖拽缓存位置（如果有），避免重绘闪烁
             const draggedPos = draggedPositionsRef.current.get(cabinet.id);
@@ -698,8 +734,15 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                 onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
                   cabinetDraggingRef.current = false;
                   const node = e.target;
-                  const newX = node.x();
-                  const newY = node.y();
+                  let newX = node.x();
+                  let newY = node.y();
+                  // 自动吸附：靠近网格线时吸附到最近网格交点
+                  const snapThreshold = 10;
+                  const snapX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+                  const snapY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+                  if (Math.abs(newX - snapX) < snapThreshold) newX = snapX;
+                  if (Math.abs(newY - snapY) < snapThreshold) newY = snapY;
+                  node.position({ x: newX, y: newY });
                   draggedPositionsRef.current.set(cabinet.id, { x: newX, y: newY });
                   onCabinetDragEnd(cabinet.id, newX, newY);
                 }}
@@ -731,6 +774,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   fill={fillColor}
                   stroke={strokeColor}
                   strokeWidth={strokeWidth}
+                  dash={cabinet.strokeStyle === 'dashed' ? [6, 4] : undefined}
                   shadowColor={isSelected ? SELECTED_BORDER_COLOR : undefined}
                   shadowBlur={isSelected ? 10 : 0}
                   shadowOpacity={isSelected ? 0.4 : 0}
@@ -757,6 +801,17 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                     fill={FILTER_MATCH_GLOW_COLOR}
                   />
                 )}
+                {/* 多选模式选中标记 */}
+                {isMultiSelected && (
+                  <Circle
+                    x={w - 8}
+                    y={8}
+                    radius={8}
+                    fill="#8b5cf6"
+                    stroke="#fff"
+                    strokeWidth={2}
+                  />
+                )}
               </Group>
             );
           })}
@@ -765,54 +820,97 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
         {/* 驿站入口层 */}
         <Layer>
           <Group>
-            {/* 驿站入口标记 - 半透明底色 */}
             <Rect
-              x={entryX - 80}
-              y={entryY - 20}
-              width={160}
-              height={40}
-              cornerRadius={20}
-              fill={ENTRY_COLOR + '15'}
-              stroke={ENTRY_COLOR}
+              x={entryX - entrySize * 2}
+              y={entryY - entrySize / 2}
+              width={entrySize * 4}
+              height={entrySize}
+              cornerRadius={entrySize / 2}
+              fill={entryColor + '15'}
+              stroke={entryColor}
               strokeWidth={2}
               dash={[4, 4]}
             />
-            {/* 驿站入口文字 */}
             <Text
-              x={entryX - 60}
-              y={entryY - 10}
-              width={120}
-              text="🏪 驿站入口"
+              x={entryX - entrySize * 1.5}
+              y={entryY - entrySize / 4}
+              width={entrySize * 3}
+              text={entryLabel}
               fontSize={14}
               fontStyle="bold"
-              fill={ENTRY_COLOR}
+              fill={entryColor}
               align="center"
               verticalAlign="middle"
             />
-            {/* 入口标记点 */}
             <Circle
               x={entryX}
-              y={entryY - 40}
-              radius={6}
-              fill={ENTRY_COLOR}
+              y={entryY - entrySize}
+              radius={entrySize / 6}
+              fill={entryColor}
             />
             <Line
-              points={[entryX, entryY - 34, entryX, entryY - 20]}
-              stroke={ENTRY_COLOR}
+              points={[entryX, entryY - entrySize * 5 / 6, entryX, entryY - entrySize / 2]}
+              stroke={entryColor}
               strokeWidth={2}
             />
           </Group>
         </Layer>
+
+        {/* 注释层 */}
+        <Layer>
+          {annotations.map((ann) => (
+            <Group
+              key={ann.id}
+              x={ann.x}
+              y={ann.y}
+              draggable={false}
+              onClick={() => onAnnotationClick?.(ann)}
+              onTap={() => onAnnotationClick?.(ann)}
+            >
+              <Rect
+                x={-6}
+                y={-6}
+                width={ann.text.length * (ann.fontSize || 14) * 0.6 + 12}
+                height={(ann.fontSize || 14) + 12}
+                fill={ann.bgColor || '#ffffff'}
+                stroke="#cbd5e1"
+                strokeWidth={1}
+                cornerRadius={6}
+                shadowBlur={4}
+                shadowColor="rgba(0,0,0,0.08)"
+                shadowOpacity={1}
+                shadowOffsetY={2}
+              />
+              <Text
+                x={0}
+                y={0}
+                text={ann.text}
+                fontSize={ann.fontSize || 14}
+                fill={ann.textColor || '#1e293b'}
+                verticalAlign="middle"
+              />
+            </Group>
+          ))}
+        </Layer>
       </Stage>
+
+      {/* 指南针 */}
+      <div className="compass">
+        <div className="compass-circle">
+          <span className="compass-n">北</span>
+          <span className="compass-e">东</span>
+          <span className="compass-s">南</span>
+          <span className="compass-w">西</span>
+          <div className="compass-needle" />
+        </div>
+      </div>
 
       <style>{`
         .canvas-container {
           flex: 1;
           overflow: hidden;
           position: relative;
-          background: #f8fafc;
-          cursor: grab;
-        }  background: #fafafa;
+          background: #fafafa;
           cursor: grab;
         }
         .canvas-container:active {
@@ -820,6 +918,59 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
         }
         .canvas-container canvas {
           display: block;
+        }
+        .compass {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          width: 64px;
+          height: 64px;
+          pointer-events: none;
+          z-index: 10;
+        }
+        .compass-circle {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.85);
+          border: 1.5px solid #e2e8f0;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .compass-n, .compass-e, .compass-s, .compass-w {
+          position: absolute;
+          font-size: 11px;
+          font-weight: 700;
+          color: #64748b;
+        }
+        .compass-n { top: 4px; left: 50%; transform: translateX(-50%); color: #ef4444; }
+        .compass-e { right: 4px; top: 50%; transform: translateY(-50%); }
+        .compass-s { bottom: 4px; left: 50%; transform: translateX(-50%); }
+        .compass-w { left: 4px; top: 50%; transform: translateY(-50%); }
+        .compass-needle {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 2px;
+          height: 18px;
+          background: #ef4444;
+          transform: translate(-50%, -100%);
+          border-radius: 1px;
+        }
+        .compass-needle::after {
+          content: '';
+          position: absolute;
+          bottom: -18px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 2px;
+          height: 18px;
+          background: #94a3b8;
+          border-radius: 1px;
+        }
+        @media (max-width: 767px) {
+          .compass { width: 48px; height: 48px; top: 8px; right: 8px; }
+          .compass-n, .compass-e, .compass-s, .compass-w { font-size: 9px; }
         }
       `}</style>
     </div>
