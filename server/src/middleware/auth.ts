@@ -30,7 +30,7 @@ declare global {
  * @returns 签发的 JWT 字符串
  */
 export function generateToken(payload: AdminPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN } as jwt.SignOptions);
 }
 
 /**

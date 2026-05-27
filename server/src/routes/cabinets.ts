@@ -84,7 +84,7 @@ router.get('/export', authMiddleware, (_req: Request, res: Response): void => {
 
   const buffer: Buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-  addLog('export_cabinets', `导出了 ${cabinets.length} 个柜机的数据到 Excel`, req.admin!.username);
+  addLog('export_cabinets', `导出了 ${cabinets.length} 个柜机的数据到 Excel`, _req.admin!.username);
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename=cabinets_export_${Date.now()}.xlsx`);
@@ -422,7 +422,7 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
  *         description: 柜机不存在
  */
 router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
-  const { id }: { id: string } = req.params;
+  const id: string = req.params.id;
   const db = getDatabase();
   const existing = db.prepare('SELECT * FROM cabinets WHERE id = ?').get(id) as Record<string, unknown> | undefined;
 
@@ -483,7 +483,7 @@ router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
  *         description: 柜机不存在
  */
 router.delete('/:id', authMiddleware, (req: Request, res: Response): void => {
-  const { id }: { id: string } = req.params;
+  const id: string = req.params.id;
   const db = getDatabase();
   const cabinet = db.prepare('SELECT * FROM cabinets WHERE id = ?').get(id) as { number: string; name: string } | undefined;
 
@@ -535,7 +535,7 @@ router.delete('/:id', authMiddleware, (req: Request, res: Response): void => {
  *         description: 柜机不存在
  */
 router.put('/:id/position', authMiddleware, (req: Request, res: Response): void => {
-  const { id }: { id: string } = req.params;
+  const id: string = req.params.id;
   const { x, y }: { x: number; y: number } = req.body;
 
   if (typeof x !== 'number' || typeof y !== 'number') {
@@ -595,7 +595,7 @@ router.put('/:id/position', authMiddleware, (req: Request, res: Response): void 
  *         description: 柜机不存在
  */
 router.put('/:id/tags', authMiddleware, (req: Request, res: Response): void => {
-  const { id }: { id: string } = req.params;
+  const id: string = req.params.id;
   const { tags }: { tags: string[] } = req.body;
 
   if (!Array.isArray(tags)) {

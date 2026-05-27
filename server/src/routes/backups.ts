@@ -109,7 +109,7 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
  *         description: 备份不存在
  */
 router.post('/:id/rollback', authMiddleware, (req: Request, res: Response): void => {
-  const { id }: { id: string } = req.params;
+  const id: string = req.params.id;
 
   const db = getDatabase();
   const backup = db.prepare('SELECT * FROM backups WHERE id = ?').get(id) as {

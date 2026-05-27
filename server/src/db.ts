@@ -126,8 +126,8 @@ export function initializeDatabase(): void {
   createTablesTransaction();
 
   // ---- 插入预置标签数据（仅首次运行） ----
-  const existingTagCount: number = database.prepare('SELECT COUNT(*) AS count FROM tags').get() as { count: number };
-  if (existingTagCount.count === 0) {
+  const tagCountResult = database.prepare('SELECT COUNT(*) AS count FROM tags').get() as { count: number };
+  if (tagCountResult.count === 0) {
     const insertTag = database.prepare(
       'INSERT INTO tags (id, name, category, color) VALUES (?, ?, ?, ?)'
     );

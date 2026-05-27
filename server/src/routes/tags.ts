@@ -118,7 +118,7 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
  *         description: 标签不存在
  */
 router.delete('/:id', authMiddleware, (req: Request, res: Response): void => {
-  const { id }: { id: string } = req.params;
+  const id: string = req.params.id;
 
   const db = getDatabase();
   const tag = db.prepare('SELECT * FROM tags WHERE id = ?').get(id) as { id: string; name: string; category: string } | undefined;

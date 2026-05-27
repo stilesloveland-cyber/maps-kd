@@ -144,7 +144,7 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
  *         description: 区域不存在
  */
 router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
-  const { id }: { id: string } = req.params;
+  const id: string = req.params.id;
 
   const db = getDatabase();
   const existing = db.prepare('SELECT * FROM zones WHERE id = ?').get(id) as Record<string, unknown> | undefined;
@@ -202,7 +202,7 @@ router.put('/:id', authMiddleware, (req: Request, res: Response): void => {
  *         description: 区域不存在
  */
 router.delete('/:id', authMiddleware, (req: Request, res: Response): void => {
-  const { id }: { id: string } = req.params;
+  const id: string = req.params.id;
 
   const db = getDatabase();
   const zone = db.prepare('SELECT * FROM zones WHERE id = ?').get(id) as { name: string } | undefined;
