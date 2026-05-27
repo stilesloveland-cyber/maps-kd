@@ -37,17 +37,20 @@ const router: Router = Router();
  *         description: 用户名或密码错误
  */
 router.post('/login', (req: Request, res: Response): void => {
-  const { username, password }: { username: string; password: string } = req.body;
+  const { username, password }: { username?: string; password: string } = req.body;
 
-  if (!username || !password) {
-    res.status(400).json({ error: '请提供用户名和密码' });
+  if (!password) {
+    res.status(400).json({ error: '请输入密码' });
     return;
   }
+
+  // 兼容前端只传密码的登录方式，默认使用 admin 用户名
+  const loginUsername: string = username || 'admin';
 
   const db = getDatabase();
   const admin = db.prepare(
     'SELECT id, username, passwordHash FROM admin WHERE username = ?'
-  ).get(username) as { id: string; username: string; passwordHash: string } | undefined;
+  ).get(loginUsername) as { id: string; username: string; passwordHash: string } | undefined;
 
   if (!admin) {
     res.status(401).json({ error: '用户名或密码错误' });
