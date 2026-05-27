@@ -42,7 +42,7 @@ interface DetailPanelProps {
 /**
  * 柜机详情面板组件
  */
-const DetailPanel: React.FC<DetailPanelProps> = ({
+const DetailPanel = ({
   cabinet,
   tags,
   zones,
@@ -52,7 +52,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   onUpdateZone,
   onDeleteCabinet,
   onUpdateStyle,
-}) => {
+}: DetailPanelProps) => {
   const { isAuthenticated } = useAuth();
   const [editingName, setEditingName] = useState<boolean>(false);
   const [nameValue, setNameValue] = useState<string>('');
