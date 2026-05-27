@@ -81,7 +81,7 @@
 ### 4. 柜机拖拽与吸附
 - 拖拽后通过 ref 缓存位置（避免 React 全量重绘导致闪白）
 - 后端 API 异步保存，刷新后数据不丢失
-- 拖拽时自动吸附到最近网格线交点（10px 阈值）
+- 拖拽时自动吸附到其他柜机边缘/中心线（10px 阈值），按住 Ctrl/Shift 可临时关闭吸附
 - 代码在 `MapCanvas.tsx` 的 `draggedPositionsRef` 和 `onDragEnd` 中
 
 ### 5. 区域交互
@@ -144,6 +144,13 @@
 | 23 | 区域性能优化 | MapCanvas.tsx | 区域渲染优化 |
 | 24 | deploy.sh 安全部署 | deploy.sh | 先 TS 检查再构建，防止错误代码部署 |
 | 25 | favicon | client/public/favicon.svg | 快递柜图标 |
+| 26 | 柜机间吸附 | MapCanvas.tsx | 拖拽柜机时吸附到其他柜机边缘/中心线（替代网格吸附），Ctrl/Shift 可临时关闭 |
+| 27 | 移动端名称优化 | MapCanvas.tsx | 根据缩放级别动态显示/隐藏柜机名称，desktop≥0.8/mobile≥1.0 全显示 |
+| 28 | 指南针修正 | MapCanvas.tsx | 修正方向标签 CSS 定位，上北下南左西右东，红针指北 |
+| 29 | 标签颜色同步 | AdminPage.tsx, MapPage.tsx, tags.ts, api/index.ts | 新增 PUT /api/tags/:id 接口 + AdminPage 标签颜色编辑 + tag-updated 自定义事件，修改后柜机自动同步 |
+| 30 | 缩放按钮修复 | MapPage.tsx, MapCanvas.tsx | 修复 +/- 缩放按钮无响应问题，通过 MapCanvas ref 的 zoomIn/zoomOut 方法 |
+| 31 | 搜索高亮增强 | MapCanvas.tsx | 搜索选中柜机增加脉冲呼吸动画（shadowBlur 20→35，3秒）、边框 4px、名称 16px 绿色 |
+| 32 | deploy.sh 增强 | deploy.sh, deploy.ps1 | 新增 6 个交互菜单（状态/日志/重启/备份）、彩色输出、磁盘检查、Docker 检测、kd 快捷命令指引 |
 
 ---
 
@@ -155,6 +162,8 @@ export interface MapCanvasRef {
   getCanvasCenter: () => { x: number; y: number };
   resetView: () => void;
   panToCabinet: (cabinetId: string) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
 }
 ```
 
@@ -214,8 +223,23 @@ sudo docker compose up -d
 **安全部署（推荐）**：
 ```bash
 ./deploy.sh
-# 输入 1 → 完整构建部署（先 TS 检查，通过后构建）
-# 输入 2 → 仅 TS 检查，不构建
+# 交互菜单：
+#   1 → 完整构建部署（git pull + TS检查 + Docker构建）
+#   2 → 仅 TS 检查
+#   3 → 查看运行状态
+#   4 → 查看容器日志
+#   5 → 重启服务
+#   6 → 数据库备份
+```
+
+**快捷命令**（输入 kd 即可运行部署脚本）：
+```bash
+# Linux/macOS
+echo "alias kd='~/maps-kd/deploy.sh'" >> ~/.bashrc && source ~/.bashrc
+
+# Windows PowerShell（管理员运行）
+if (!(Test-Path $PROFILE)) { New-Item -Path $PROFILE -Force }
+Add-Content -Path $PROFILE -Value 'function kd { & "E:\trae项目\快递柜\deploy.ps1" }'
 ```
 
 更新代码后：

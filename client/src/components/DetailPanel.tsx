@@ -322,25 +322,25 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
           <div className="style-row">
             <label className="style-label">跟随标签颜色</label>
             <input type="checkbox" checked={cabinet.followTagColor !== false} onChange={(e) => {
-              onUpdateStyle?.(cabinet.id, { followTagColor: e.target.checked });
+              if (onUpdateStyle) onUpdateStyle(cabinet.id, { followTagColor: e.target.checked });
             }} />
           </div>
           <div className="style-row">
             <label className="style-label">边框颜色</label>
             <input type="color" className="style-color" value={cabinet.strokeColor || '#94a3b8'} onChange={(e) => {
-              onUpdateStyle?.(cabinet.id, { strokeColor: e.target.value });
+              if (onUpdateStyle) onUpdateStyle(cabinet.id, { strokeColor: e.target.value });
             }} />
           </div>
           <div className="style-row">
             <label className="style-label">边框宽度</label>
             <input type="number" className="style-number" min={0} max={6} value={cabinet.strokeWidth || 2} onChange={(e) => {
-              onUpdateStyle?.(cabinet.id, { strokeWidth: Number(e.target.value) });
+              if (onUpdateStyle) onUpdateStyle(cabinet.id, { strokeWidth: Number(e.target.value) });
             }} />
           </div>
           <div className="style-row">
             <label className="style-label">边框样式</label>
             <select className="style-select" value={cabinet.strokeStyle || 'solid'} onChange={(e) => {
-              onUpdateStyle?.(cabinet.id, { strokeStyle: e.target.value as 'solid' | 'dashed' });
+              if (onUpdateStyle) onUpdateStyle(cabinet.id, { strokeStyle: e.target.value as 'solid' | 'dashed' });
             }}>
               <option value="solid">实线</option>
               <option value="dashed">虚线</option>
