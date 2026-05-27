@@ -583,7 +583,7 @@ const AdminPage: React.FC = () => {
                           <span className="backup-version">
                             v{backup.version}
                             <span className={`backup-type ${backup.type}`}>{backup.type === 'auto' ? '自动' : '手动'}</span>
-                            {isProtected && <Lock size={12} className="backup-locked" title="受保护，不可删除" />}
+                            {isProtected && <span title="受保护，不可删除"><Lock size={12} className="backup-locked" /></span>}
                           </span>
                           {backup.remark && <span className="backup-remark">{backup.remark}</span>}
                           <span className="backup-time">{new Date(backup.createdAt).toLocaleString('zh-CN')}</span>
