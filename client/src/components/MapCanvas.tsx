@@ -14,7 +14,7 @@
 import React, { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import Konva from 'konva';
-import type { Cabinet, Zone } from '../types';
+import type { Cabinet, Zone, Tag } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 // ---------- 常量定义 ----------
@@ -61,6 +61,8 @@ interface MapCanvasProps {
   cabinets: Cabinet[];
   /** 区域列表 */
   zones: Zone[];
+  /** 标签列表 */
+  tags: Tag[];
   /** 当前选中的柜机 ID */
   selectedCabinetId: string | null;
   /** 选中的标签 ID 列表（用于筛选高亮） */
@@ -98,13 +100,25 @@ const generateGridLines = (width: number, height: number) => {
 /** MapCanvas 暴露给父组件的方法 */
 export interface MapCanvasRef {
   getCanvasCenter: () => { x: number; y: number };
+  /** 重置视图到驿站入口中心 */
+  resetView: () => void;
+  /** 平移到指定柜机位置 */
+  panToCabinet: (cabinetId: string) => void;
 }
+
+/** 获取柜机的品牌名称（取第一个 brand 类标签） */
+const getCabinetBrand = (cabinet: Cabinet, allTags: Tag[]): string => {
+  if (!cabinet.tags || cabinet.tags.length === 0) return '';
+  const brandTag = allTags.find((t) => cabinet.tags.includes(t.id) && t.category === 'brand');
+  return brandTag ? brandTag.name : '';
+};
 
 // ---------- 组件 ----------
 
 const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   cabinets,
   zones,
+  tags,
   selectedCabinetId,
   filterTagIds,
   searchHighlightId,
@@ -135,16 +149,23 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   // 是否正在拖拽视图（区分拖拽和点击）
   const isDraggingRef = useRef(false);
 
+  /** 驿站入口位置（底部中间） */
+  const entryX = DEFAULT_WIDTH / 2;
+  const entryY = DEFAULT_HEIGHT - 80;
+
+  /** 计算以驿站入口为中心的视图配置 */
+  const getEntryCenteredConfig = useCallback(() => ({
+    x: containerSize.width / 2 - entryX * 0.6,
+    y: containerSize.height / 2 - entryY * 0.6,
+    scale: 0.6,
+  }), [containerSize]);
+
   /**
-   * 初始化渲染时自动将视图居中到画布中心
+   * 初始化渲染时自动将视图居中到驿站入口
    */
   useEffect(() => {
     if (containerSize.width > 0 && containerSize.height > 0) {
-      setStageConfig({
-        x: containerSize.width / 2 - DEFAULT_WIDTH / 2,
-        y: containerSize.height / 2 - DEFAULT_HEIGHT / 2 + 100, // 往下偏移一点，给顶部工具栏留空间
-        scale: 0.6,
-      });
+      setStageConfig(getEntryCenteredConfig());
     }
   }, [containerSize.width, containerSize.height]);
 
@@ -203,10 +224,20 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
     };
   }, [containerSize, stageConfig]);
 
-  // 通过 ref 暴露 getCanvasCenter 方法给父组件
+  // 通过 ref 暴露方法给父组件
   useImperativeHandle(ref, () => ({
     getCanvasCenter,
-  }), [getCanvasCenter]);
+    resetView: () => setStageConfig(getEntryCenteredConfig()),
+    panToCabinet: (cabinetId: string) => {
+      const cab = cabinets.find((c) => c.id === cabinetId);
+      if (!cab) return;
+      setStageConfig({
+        x: containerSize.width / 2 - cab.x * stageConfig.scale,
+        y: containerSize.height / 2 - cab.y * stageConfig.scale,
+        scale: stageConfig.scale,
+      });
+    },
+  }), [getCanvasCenter, getEntryCenteredConfig, cabinets, containerSize, stageConfig.scale]);
 
   /**
    * 滚轮缩放事件处理
@@ -336,10 +367,6 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
 
   // 网格线
   const gridLines = generateGridLines(DEFAULT_WIDTH, DEFAULT_HEIGHT);
-
-  // 驿站入口位置（底部中间）
-  const entryX = DEFAULT_WIDTH / 2;
-  const entryY = DEFAULT_HEIGHT - 80;
 
   return (
     <div className="canvas-container" ref={containerRef}>
@@ -538,28 +565,18 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   shadowBlur={isSelected ? 10 : 0}
                   shadowOpacity={isSelected ? 0.4 : 0}
                 />
-                {/* 柜机编号 */}
+                {/* 柜机名称（居中大字：品牌x号机） */}
                 <Text
                   x={0}
                   y={0}
                   width={w}
                   height={h}
-                  text={cabinet.number}
+                  text={`${getCabinetBrand(cabinet, tags)}${cabinet.name}`}
                   fontSize={14}
                   fontStyle="bold"
                   fill="#1e293b"
                   align="center"
                   verticalAlign="middle"
-                />
-                {/* 柜机名称（在编号下方） */}
-                <Text
-                  x={0}
-                  y={h - 16}
-                  width={w}
-                  text={cabinet.name}
-                  fontSize={10}
-                  fill="#64748b"
-                  align="center"
                 />
                 {/* 筛选匹配绿点标记 */}
                 {isFilterActive && filterMatch && (

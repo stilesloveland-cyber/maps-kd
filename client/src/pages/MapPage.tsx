@@ -209,6 +209,7 @@ const MapPage: React.FC = () => {
   const handleSearchResult = useCallback((cabinetId: string) => {
     setSelectedCabinetId(cabinetId);
     setSearchHighlightId(cabinetId);
+    mapCanvasRef.current?.panToCabinet(cabinetId);
     // 3秒后清除搜索高亮
     setTimeout(() => setSearchHighlightId(null), 3000);
   }, []);
@@ -247,8 +248,7 @@ const MapPage: React.FC = () => {
   }, []);
 
   const handleResetView = useCallback(() => {
-    // 重置视图会通过重新渲染触发
-    window.dispatchEvent(new CustomEvent('reset-view'));
+    mapCanvasRef.current?.resetView();
   }, []);
 
   /**
@@ -304,6 +304,7 @@ const MapPage: React.FC = () => {
           ref={mapCanvasRef}
           cabinets={cabinets}
           zones={zones}
+          tags={tags}
           selectedCabinetId={selectedCabinetId}
           filterTagIds={filterTagIds}
           searchHighlightId={searchHighlightId}
