@@ -1,0 +1,394 @@
+{
+  "appName": "快递柜可视化地图管理系统",
+  "version": "1.0.0",
+  "description": "一个可部署在服务器上的Web应用，用于可视化查看和管理快递驿站不同编号快递柜的相对位置。支持地图式拖拽、缩放、标签筛选、柜机管理、操作日志、版本备份与回滚、管理员权限控制、全局搜索及移动端适配。",
+  "techStack": {
+    "frontend": {
+      "framework": "React 18 + TypeScript",
+      "stateManagement": "React Context + useReducer",
+      "styling": "CSS Modules + 响应式设计（移动端适配）",
+      "mapLibrary": "react-konva (基于Canvas的2D绘图库，支持拖拽、缩放、触屏事件)",
+      "buildTool": "Vite",
+      "uiIcons": "lucide-react"
+    },
+    "backend": {
+      "runtime": "Node.js",
+      "framework": "Express",
+      "language": "TypeScript",
+      "auth": "JWT Token（管理员登录鉴权）",
+      "passwordHash": "bcryptjs"
+    },
+    "database": "SQLite (通过 better-sqlite3，轻量级零配置)"
+  },
+  "features": [
+    {
+      "id": "F001",
+      "name": "地图画布引擎",
+      "description": "提供类似地图的画布交互体验，支持鼠标拖拽平移和滚轮缩放，所有柜机相对于驿站坐标保持固定位置。",
+      "acceptanceCriteria": [
+        "画布支持鼠标拖拽平移视图",
+        "画布支持滚轮缩放（放大/缩小）",
+        "缩放时柜机模型保持比例缩放",
+        "画布有网格背景辅助定位",
+        "提供缩放控制按钮（+/-/重置）"
+      ]
+    },
+    {
+      "id": "F002",
+      "name": "快递柜模型渲染",
+      "description": "在画布上渲染长条形快递柜，每个柜机显示编号和名称，底部显示驿站标记作为参考点。",
+      "acceptanceCriteria": [
+        "柜机渲染为长条形矩形，带圆角边框",
+        "每个柜机上方显示编号和名称",
+        "底部固定位置显示'驿站入口'参考标记",
+        "柜机支持不同颜色或样式区分",
+        "未选中时柜机显示为半透明状态底色"
+      ]
+    },
+    {
+      "id": "F003",
+      "name": "快递柜管理（增删改）",
+      "description": "支持在画布上添加新的快递柜、删除已有快递柜、拖拽移动柜机位置。所有修改操作需管理员登录。",
+      "acceptanceCriteria": [
+        "点击'添加柜机'按钮，在画布中心位置生成新柜机",
+        "选中柜机后可按Delete键或点击删除按钮移除",
+        "柜机支持鼠标拖拽移动位置",
+        "添加时可设置柜机名称和编号",
+        "拖拽时显示实时位置坐标提示",
+        "支持批量删除（多选后删除）",
+        "所有修改操作需管理员已登录",
+        "每次修改操作（增/删/改/拖拽/标签编辑）后，系统数据版本号（dataVersion）自动+1",
+        "数据版本号显示在导航栏右侧和管理后台概览中"
+      ]
+    },
+    {
+      "id": "F004",
+      "name": "标签系统",
+      "description": "为每个快递柜设置多标签（快递公司标签和柜机品牌标签），支持按标签检索和可视化高亮。",
+      "acceptanceCriteria": [
+        "预置标签：快递公司（顺丰、圆通、申通、中通、韵达、京东、极兔、邮政）",
+        "预置标签：柜机品牌（袋鼠、丰巢、速递易、妈妈驿站、菜鸟驿站）",
+        "支持为每个柜机添加/移除多个标签",
+        "标签以彩色徽章形式显示在柜机详情面板中",
+        "支持自定义新增标签"
+      ]
+    },
+    {
+      "id": "F005",
+      "name": "标签筛选与高亮",
+      "description": "通过标签筛选柜机，命中的柜机保持正常透明度，未命中的柜机降低透明度，实现突出显示。",
+      "acceptanceCriteria": [
+        "筛选面板展示所有可用标签（按分类分组）",
+        "多选标签筛选（或关系：命中任一标签即匹配）",
+        "匹配的柜机保持100%不透明度",
+        "未匹配的柜机降低至20%透明度+灰色遮罩",
+        "匹配柜机外发光/边框高亮动画效果",
+        "取消筛选后所有柜机恢复正常显示"
+      ]
+    },
+    {
+      "id": "F006",
+      "name": "柜机详情面板",
+      "description": "点击柜机弹出详情面板，展示和编辑柜机信息。编辑操作需管理员登录。",
+      "acceptanceCriteria": [
+        "点击柜机弹出侧边面板或浮窗",
+        "面板显示：柜机名称、编号、坐标位置(X,Y)",
+        "面板展示已添加的标签（可移除）",
+        "面板提供标签添加功能（从预置标签选择）",
+        "面板提供删除柜机按钮",
+        "面板提供编辑柜机名称功能",
+        "点击空白区域或关闭按钮关闭面板",
+        "编辑操作需管理员已登录"
+      ]
+    },
+    {
+      "id": "F007",
+      "name": "数据持久化",
+      "description": "所有柜机数据、标签数据、位置信息持久化存储，支持服务端API读写。",
+      "acceptanceCriteria": [
+        "柜机增删改操作实时保存到数据库",
+        "标签增删改操作实时保存到数据库",
+        "页面刷新后数据完整恢复",
+        "后端提供RESTful API接口",
+        "数据库使用SQLite，轻量无额外依赖"
+      ]
+    },
+    {
+      "id": "F008",
+      "name": "Docker容器化部署",
+      "description": "项目支持 Docker 容器化，一条命令即可在任意服务器上一键部署。",
+      "acceptanceCriteria": [
+        "提供多阶段构建 Dockerfile（构建 + 运行分离，镜像小巧）",
+        "提供交互式部署脚本 deploy.sh（Linux）和 deploy.ps1（Windows）",
+        "脚本启动后自动检测服务器环境：操作系统、Docker版本、公网IP",
+        "提示用户输入端口号（默认 3000），用户可直接回车使用默认值",
+        "可选配置域名：用户选择'是'后输入域名，脚本自动生成Nginx配置文件",
+        "脚本自动根据端口和域名配置生成 .env 文件和 docker-compose.yml",
+        "脚本自动执行 docker compose up -d 启动容器",
+        "提供已生成的 Nginx 配置文件（nginx.conf），含域名、SSL/HTTPS（证书路径可配置）",
+        "部署脚本识别 Cloudflare 场景：若用户选择 Cloudflare 托管，Nginx 仅监听 HTTP 80 端口",
+        "非 Cloudflare 场景：支持通过 Let's Encrypt 或用户自行提供证书启用 HTTPS",
+        "提供 Cloudflare 模式下 SSL/TLS 模式的配置指引：推荐 Flexible 或 Origin CA",
+        "SQLite 数据挂载宿主机卷，容器重启不丢失数据",
+        "前端构建为静态文件由 Express 托管",
+        "提供 .dockerignore 忽略 node_modules 等无关文件",
+        "提供 .env.example 示例文件说明配置项"
+      ]
+    },
+    {
+      "id": "F009",
+      "name": "管理员与密码鉴权系统",
+      "description": "系统默认初始化一个管理员账号，所有柜机修改操作（增/删/改/拖拽/标签编辑）均需管理员登录。游客仅可查看地图和筛选。",
+      "acceptanceCriteria": [
+        "首次部署时自动创建默认管理员账号（admin），初始化密码在部署脚本中设置",
+        "登录页面：输入密码即可登录（单管理员模式，简洁够用）",
+        "登录成功后返回 JWT Token，后续请求携带该 Token",
+        "未登录状态下，画布为只读模式（可查看、可拖拽视图、可筛选，不可修改）",
+        "登录后，工具栏显示退出按钮和当前登录状态",
+        "后端接口通过中间件校验 JWT，未授权请求返回 401",
+        "支持修改管理员密码"
+      ]
+    },
+    {
+      "id": "F010",
+      "name": "操作日志",
+      "description": "记录所有柜机修改操作和系统操作，仅管理员可查看日志。",
+      "acceptanceCriteria": [
+        "自动记录以下操作：添加柜机、删除柜机、移动柜机、编辑柜机信息、修改标签",
+        "自动记录：创建备份、回滚版本、登录/登出、修改密码",
+        "每条日志包含：操作时间、操作类型、操作详情（如'添加柜机 C-03'）、操作人",
+        "日志按时间倒序排列，最新的在最上面",
+        "提供日志查看页面/面板，仅管理员可访问",
+        "日志支持按操作类型筛选和按日期范围搜索",
+        "日志无限期保留"
+      ]
+    },
+    {
+      "id": "F011",
+      "name": "版本备份与回滚",
+      "description": "每次添加或删除柜机时自动生成备份快照；管理员可手动创建主备份；支持查看备份历史并一键回滚到任意版本。",
+      "acceptanceCriteria": [
+        "自动备份：每次添加或删除柜机操作后，自动生成一个版本快照",
+        "自动备份保存完整的柜机数据（所有柜机的位置、名称、编号、标签、颜色）",
+        "手动主备份：管理员可在详情面板或工具栏点击'创建主备份'，生成带备注的手动备份",
+        "主备份用途：管理员连续调整多个柜机位置后，手动创建一个检查点",
+        "备份列表展示：版本号、时间、类型（自动/手动）、备注（仅手动备份有）",
+        "回滚功能：选择任意一个备份版本，点击回滚，所有柜机数据恢复为该版本的状态",
+        "回滚操作本身也记录到操作日志中",
+        "回滚前弹出确认对话框，提示'回滚将覆盖当前所有柜机数据，是否继续？'",
+        "备份数据存储在 SQLite 的备份表中，以 JSON 格式保存完整数据快照"
+      ]
+    },
+    {
+      "id": "F012",
+      "name": "全局搜索",
+      "description": "支持按柜机编号和名称快速搜索定位柜机。",
+      "acceptanceCriteria": [
+        "顶部导航栏提供搜索输入框，输入关键词实时搜索",
+        "搜索范围：柜机编号、柜机名称",
+        "搜索结果以下拉列表形式展示，显示匹配的柜机编号和名称",
+        "点击搜索结果，画布自动平移到该柜机位置并高亮闪烁",
+        "支持拼音/模糊搜索（含部分匹配）",
+        "无结果时显示'未找到匹配的柜机'"
+      ]
+    },
+    {
+      "id": "F013",
+      "name": "移动端适配",
+      "description": "页面在手机和平板等小屏设备上正常浏览和使用。",
+      "acceptanceCriteria": [
+        "画布支持触屏手势：单指拖动平移、双指捏合缩放",
+        "搜索框、筛选面板、操作面板在小屏上折叠为可展开的抽屉式布局",
+        "柜机详情面板在小屏上从底部弹出（Bottom Sheet）而非侧边面板",
+        "工具栏按钮在小屏上显示为图标模式，减少占用空间",
+        "画布区域在小屏上占据尽可能大的屏幕空间",
+        "响应式断点：≥1024px 桌面、≥768px 平板、<768px 手机",
+        "所有交互在移动设备上流畅可用"
+      ]
+    },
+    {
+      "id": "F014",
+      "name": "快捷管理后台面板",
+      "description": "管理员登录后，导航栏出现'后台管理'按钮，点击跳转到独立的后台管理页面(/admin)，提供一站式集中管理体验。",
+      "acceptanceCriteria": [
+        "管理员登录后，导航栏出现'后台管理'按钮，点击跳转到 /admin 独立页面",
+        "管理页面顶部显示面包屑导航：首页 > 后台管理，点击'首页'可返回主地图页面",
+        "页面按功能分区展示以下操作卡片/入口：",
+        "  ┣─ 📊 概览统计：柜机总数、标签数量、区域数量、备份数量、今日操作数、数据版本号",
+        "  ┣─ 🔐 账户安全：修改密码、退出登录",
+        "  ┣─ 📝 操作日志：完整日志列表（分页、按类型筛选、按日期搜索），最新在上",
+        "  ┣─ 💾 版本管理：备份列表（自动/手动）、创建主备份（带备注输入框）、一键回滚",
+        "  ┣─ 🏷️ 标签管理：查看所有标签、添加自定义标签、删除标签",
+        "  ┣─ 🗺️ 区域管理：创建/编辑/删除区域、调整区域位置和大小",
+        "  ┣─ 📥 批量导入导出：导出当前布局(.xlsx)、上传Excel导入、下载导入模板",
+        "  ┗─ ⚙️ 系统信息：应用版本号(v1.0.0)、数据版本号(v123)、Docker运行状态、数据库大小、API文档链接",
+        "每个功能卡片点击后可直接在页面内展开执行操作，无需再跳转",
+        "非管理员直接访问 /admin 自动重定向到登录页",
+        "页面在移动端自适应布局，功能卡片纵向排列"
+      ]
+    },
+    {
+      "id": "F015",
+      "name": "柜机区域分组",
+      "description": "在画布上为柜机划分区域（如A区、B区），用带颜色的虚线框和底色标注，驿站作为整体参考点。",
+      "acceptanceCriteria": [
+        "管理员可在后台管理或画布上创建区域，设置区域名称（如'A区'）和颜色",
+        "创建区域后在画布上显示为一个带颜色边框的虚线矩形框，框内有半透明底色",
+        "区域框可以拖拽移动位置和调整大小",
+        "区域框上显示区域名称标签",
+        "柜机可以分配到某个区域（在详情面板中选择所属区域）",
+        "分配后柜机的颜色自动跟随区域颜色，保持一致视觉",
+        "区域支持筛选：在标签筛选面板中可按区域筛选柜机",
+        "区域数据存储在 SQLite 的 zone 表中",
+        "底部'驿站入口'标记不归属于任何区域，始终固定显示"
+      ]
+    },
+    {
+      "id": "F016",
+      "name": "Excel 批量导入/导出",
+      "description": "支持通过 Excel 文件批量导入柜机，以及将当前布局导出为 Excel。",
+      "acceptanceCriteria": [
+        "导出功能：当前所有柜机数据导出为 .xlsx 文件",
+        "导出的 Excel 包含以下列：编号、名称、X坐标、Y坐标、宽度、高度、颜色、区域、标签",
+        "导入功能：在后台管理页面上传 .xlsx 文件，批量创建柜机",
+        "导入时位置处理策略（二选一，由用户选择）：",
+        "  策略A「先导入再摆放」：导入的柜机按编号顺序在画布中心区域自动排列，用户后续拖拽定位",
+        "  策略B「指定坐标」：直接使用 Excel 中的 X/Y 坐标定位（需用户提前量好距离）",
+        "导入前预览：上传后先展示将要导入的柜机列表，确认后再执行",
+        "导入结果反馈：显示成功导入多少台、失败多少台及原因（如编号重复）",
+        "导入时会自动检测编号重复并跳过，记录跳过原因",
+        "支持下载导入模板（含示例数据的 .xlsx 文件）"
+      ]
+    },
+    {
+      "id": "F017",
+      "name": "Swagger API 接口文档",
+      "description": "自动生成 RESTful API 文档，方便后期维护和二次开发。",
+      "acceptanceCriteria": [
+        "集成 swagger-jsdoc + swagger-ui-express，自动扫描后端路由生成文档",
+        "访问 /api-docs 即可查看所有接口的在线文档页面",
+        "文档包含：每个接口的请求方法、路径、参数说明、返回数据格式示例",
+        "标注每个接口是否需要管理员登录（需携带 JWT Token）",
+        "提供'Try it out'功能，可在文档页面直接测试接口",
+        "在后台管理页面的⚙️系统信息卡片中添加'API文档'入口链接"
+      ]
+    }
+  ],
+  "dataModel": {
+    "cabinet": {
+      "fields": [
+        { "name": "id", "type": "string", "description": "唯一标识(UUID)" },
+        { "name": "name", "type": "string", "description": "柜机名称，如'A区柜'" },
+        { "name": "number", "type": "string", "description": "柜机编号，如'C-01'" },
+        { "name": "x", "type": "number", "description": "画布X坐标" },
+        { "name": "y", "type": "number", "description": "画布Y坐标" },
+        { "name": "width", "type": "number", "description": "柜机宽度(默认200)" },
+        { "name": "height", "type": "number", "description": "柜机高度(默认60)" },
+        { "name": "tags", "type": "array<string>", "description": "标签ID列表" },
+        { "name": "zoneId", "type": "string", "description": "所属区域ID（可为空）" },
+        { "name": "color", "type": "string", "description": "柜机底色" },
+        { "name": "createdAt", "type": "string", "description": "创建时间" },
+        { "name": "updatedAt", "type": "string", "description": "更新时间" }
+      ]
+    },
+    "tag": {
+      "fields": [
+        { "name": "id", "type": "string", "description": "唯一标识" },
+        { "name": "name", "type": "string", "description": "标签名称" },
+        { "name": "category", "type": "string", "description": "标签分类(courier/brand/custom)" },
+        { "name": "color", "type": "string", "description": "标签颜色" }
+      ]
+    },
+    "zone": {
+      "fields": [
+        { "name": "id", "type": "string", "description": "唯一标识(UUID)" },
+        { "name": "name", "type": "string", "description": "区域名称，如'A区'" },
+        { "name": "color", "type": "string", "description": "区域颜色" },
+        { "name": "x", "type": "number", "description": "区域外框X坐标" },
+        { "name": "y", "type": "number", "description": "区域外框Y坐标" },
+        { "name": "width", "type": "number", "description": "区域外框宽度" },
+        { "name": "height", "type": "number", "description": "区域外框高度" },
+        { "name": "createdAt", "type": "string", "description": "创建时间" },
+        { "name": "updatedAt", "type": "string", "description": "更新时间" }
+      ]
+    },
+    "admin": {
+      "fields": [
+        { "name": "id", "type": "string", "description": "唯一标识" },
+        { "name": "username", "type": "string", "description": "管理员用户名（默认admin）" },
+        { "name": "passwordHash", "type": "string", "description": "密码 bcrypt 哈希" },
+        { "name": "createdAt", "type": "string", "description": "创建时间" }
+      ]
+    },
+    "log": {
+      "fields": [
+        { "name": "id", "type": "string", "description": "唯一标识" },
+        { "name": "type", "type": "string", "description": "操作类型：add_cabinet/del_cabinet/move_cabinet/edit_cabinet/edit_tags/create_zone/edit_zone/del_zone/import_cabinets/export_cabinets/create_backup/rollback/login/logout/change_password" },
+        { "name": "detail", "type": "string", "description": "操作详情描述" },
+        { "name": "operator", "type": "string", "description": "操作人（默认admin）" },
+        { "name": "createdAt", "type": "string", "description": "操作时间" }
+      ]
+    },
+    "backup": {
+      "fields": [
+        { "name": "id", "type": "string", "description": "唯一标识" },
+        { "name": "version", "type": "number", "description": "备份版本号（自增）" },
+        { "name": "type", "type": "string", "description": "备份类型：auto（自动）/ manual（手动）" },
+        { "name": "remark", "type": "string", "description": "备注（手动备份时填写，自动备份为null）" },
+        { "name": "snapshot", "type": "text", "description": "数据快照（JSON格式，包含所有柜机完整数据）" },
+        { "name": "createdAt", "type": "string", "description": "备份时间" }
+      ]
+    },
+    "systemMeta": {
+      "description": "系统元数据表，存储全局配置信息，仅一条记录",
+      "fields": [
+        { "name": "id", "type": "string", "description": "固定值 'global'" },
+        { "name": "dataVersion", "type": "number", "description": "数据版本号，每次柜机/标签修改操作自动+1，从1开始递增" },
+        { "name": "appVersion", "type": "string", "description": "应用版本号，如'1.0.0'" },
+        { "name": "adminPasswordSet", "type": "boolean", "description": "是否已设置管理员初始密码" },
+        { "name": "createdAt", "type": "string", "description": "创建时间" },
+        { "name": "updatedAt", "type": "string", "description": "更新时间" }
+      ]
+    }
+  },
+  "apiDesign": {
+    "baseUrl": "/api",
+    "endpoints": [
+      { "method": "GET", "path": "/api/cabinets", "description": "获取所有柜机列表（公开）" },
+      { "method": "POST", "path": "/api/cabinets", "description": "新增柜机（需登录）" },
+      { "method": "PUT", "path": "/api/cabinets/:id", "description": "更新柜机信息（需登录）" },
+      { "method": "DELETE", "path": "/api/cabinets/:id", "description": "删除柜机（需登录）" },
+      { "method": "PUT", "path": "/api/cabinets/:id/position", "description": "更新柜机位置（需登录）" },
+      { "method": "PUT", "path": "/api/cabinets/:id/tags", "description": "更新柜机标签（需登录）" },
+      { "method": "GET", "path": "/api/tags", "description": "获取所有标签（公开）" },
+      { "method": "POST", "path": "/api/tags", "description": "新增自定义标签（需登录）" },
+      { "method": "DELETE", "path": "/api/tags/:id", "description": "删除自定义标签（需登录）" },
+      { "method": "GET", "path": "/api/zones", "description": "获取所有区域（公开）" },
+      { "method": "POST", "path": "/api/zones", "description": "创建新区域（需登录）" },
+      { "method": "PUT", "path": "/api/zones/:id", "description": "更新区域信息/位置（需登录）" },
+      { "method": "DELETE", "path": "/api/zones/:id", "description": "删除区域（需登录，区域内的柜机自动变为无区域）" },
+      { "method": "POST", "path": "/api/auth/login", "description": "管理员登录" },
+      { "method": "PUT", "path": "/api/auth/password", "description": "修改管理员密码（需登录）" },
+      { "method": "GET", "path": "/api/auth/status", "description": "检查登录状态" },
+      { "method": "GET", "path": "/api/logs", "description": "获取操作日志列表（需登录，支持分页、按类型筛选、按日期范围搜索）" },
+      { "method": "GET", "path": "/api/logs/recent", "description": "获取最近N条操作日志（需登录，供后台面板概览用）" },
+      { "method": "GET", "path": "/api/backups", "description": "获取备份列表（需登录）" },
+      { "method": "POST", "path": "/api/backups", "description": "创建手动主备份（需登录）" },
+      { "method": "POST", "path": "/api/backups/:id/rollback", "description": "回滚到指定备份版本（需登录）" },
+      { "method": "GET", "path": "/api/stats", "description": "获取系统概览统计（需登录：柜机数、标签数、备份数、今日操作数、版本号、数据库大小）" },
+      { "method": "GET", "path": "/api/cabinets/export", "description": "导出柜机数据为 .xlsx 文件（需登录）" },
+      { "method": "POST", "path": "/api/cabinets/import", "description": "从 .xlsx 文件批量导入柜机（需登录）" },
+      { "method": "GET", "path": "/api/cabinets/template", "description": "下载导入模板 .xlsx 文件（公开）" }
+    ]
+  },
+  "uiLayout": {
+    "description": "响应式布局，桌面端为顶部工具栏+画布+侧边面板，移动端为抽屉式布局。后台管理为独立页面(/admin)。",
+    "layoutSections": [
+      "顶部导航栏：应用标题 + 搜索框 + 添加柜机按钮 + 缩放控件 + 后台管理按钮（登录后显示）+ 数据版本号显示 + 登录/退出按钮",
+      "主区域（占据大部分空间）：Canvas画布（可拖拽+缩放，支持触屏）",
+      "右侧（桌面端）/底部抽屉（移动端）：标签筛选面板 + 柜机详情面板",
+      "底部：驿站入口参考标记（固定在画布坐标系中）",
+      "后台管理页面（/admin）：独立页面，集成概览统计、账户安全、操作日志、版本管理、标签管理、系统信息等功能卡片，顶部有面包屑导航"
+    ]
+  }
+}
