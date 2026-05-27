@@ -652,6 +652,6 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
       `}</style>
     </div>
   );
-};
+});
 
 export default MapCanvas;
