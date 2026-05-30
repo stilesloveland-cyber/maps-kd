@@ -251,8 +251,11 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   /**
    * 初始化渲染时自动将视图居中到驿站入口
    */
+  const hasInitializedRef = useRef(false);
+
   useEffect(() => {
-    if (containerSize.width > 0 && containerSize.height > 0) {
+    if (containerSize.width > 0 && containerSize.height > 0 && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       setStageConfig(getEntryCenteredConfig());
     }
   }, [containerSize.width, containerSize.height]);
