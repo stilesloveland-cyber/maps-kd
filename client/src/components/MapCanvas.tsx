@@ -303,11 +303,13 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
     panToCabinet: (cabinetId: string) => {
       const cab = cabinets.find((c) => c.id === cabinetId);
       if (!cab) return;
-      setStageConfig({
-        x: containerSize.width / 2 - cab.x * stageConfig.scale,
-        y: containerSize.height / 2 - cab.y * stageConfig.scale,
-        scale: stageConfig.scale,
-      });
+      const cw = cab.width || CABINET_DEFAULT_WIDTH;
+      const ch = cab.height || CABINET_DEFAULT_HEIGHT;
+      setStageConfig((prev) => ({
+        x: containerSize.width / 2 - (cab.x + cw / 2) * prev.scale,
+        y: containerSize.height / 2 - (cab.y + ch / 2) * prev.scale,
+        scale: prev.scale,
+      }));
     },
     zoomIn: () => {
       const centerX = containerSize.width / 2;

@@ -88,6 +88,16 @@ const MapPage: React.FC = () => {
   // MapCanvas 的 ref，用于获取视图中心位置
   const mapCanvasRef = useRef<MapCanvasRef>(null);
 
+  /**
+   * 选中柜机并平移到视图中央
+   */
+  const handleSelectCabinet = useCallback((cabinetId: string | null) => {
+    setSelectedCabinetId(cabinetId);
+    if (cabinetId) {
+      setTimeout(() => mapCanvasRef.current?.panToCabinet(cabinetId), 50);
+    }
+  }, []);
+
   // ==================== 数据加载 ====================
 
   /**
@@ -157,6 +167,7 @@ const MapPage: React.FC = () => {
       });
       setCabinets((prev) => [...prev, newCabinet]);
       setSelectedCabinetId(newCabinet.id);
+      setTimeout(() => mapCanvasRef.current?.panToCabinet(newCabinet.id), 100);
     } catch (err) {
       console.error('添加柜机失败:', err);
     }
@@ -585,7 +596,7 @@ const MapPage: React.FC = () => {
           selectedCabinetId={selectedCabinetId}
           filterTagIds={filterTagIds}
           searchHighlightId={searchHighlightId}
-          onSelectCabinet={setSelectedCabinetId}
+          onSelectCabinet={handleSelectCabinet}
           onCabinetDragEnd={handleCabinetDragEnd}
           addPosition={addPositionRef.current}
           onClickEmpty={handleClickEmpty}
