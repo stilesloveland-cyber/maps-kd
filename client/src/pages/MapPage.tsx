@@ -10,6 +10,7 @@ import { useToast } from '../context/ToastContext';
 import type { Cabinet, Tag as TagType, Zone, SystemMeta, Annotation, CreateAnnotationRequest, UpdateAnnotationRequest } from '../types';
 import {
   getCabinets,
+  getNextNumber,
   getTags,
   getZones,
   getSystemMeta,
@@ -51,14 +52,6 @@ const randomColor = (): string => {
 /**
  * 生成柜机编号（基于当前最大的编号递增）
  */
-const generateNumber = (cabinets: Cabinet[]): string => {
-  const maxNum = cabinets.reduce((max, c) => {
-    const match = c.number.match(/C-(\d+)/);
-    return match ? Math.max(max, parseInt(match[1])) : max;
-  }, 0);
-  return `C-${String(maxNum + 1).padStart(2, '0')}`;
-};
-
 const MapPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -141,18 +134,16 @@ const MapPage: React.FC = () => {
   const handleAddCabinet = useCallback(async () => {
     if (!isAuthenticated) return;
 
-    const newNumber = generateNumber(cabinets);
-    const newName = `${parseInt(newNumber.replace('C-', ''))}号柜`;
-
-    // 获取当前视图中心对应的画布坐标
-    const center = mapCanvasRef.current
-      ? mapCanvasRef.current.getCanvasCenter()
-      : { x: 800, y: 500 };
-    // 加一点随机偏移，避免重叠
-    const centerX = center.x + (Math.random() - 0.5) * 100;
-    const centerY = center.y + (Math.random() - 0.5) * 100;
-
     try {
+      const { number: newNumber, num } = await getNextNumber();
+      const newName = `${num}号柜`;
+
+      const center = mapCanvasRef.current
+        ? mapCanvasRef.current.getCanvasCenter()
+        : { x: 800, y: 500 };
+      const centerX = center.x + (Math.random() - 0.5) * 100;
+      const centerY = center.y + (Math.random() - 0.5) * 100;
+
       const newCabinet = await createCabinet({
         name: newName,
         number: newNumber,
@@ -167,7 +158,7 @@ const MapPage: React.FC = () => {
     } catch (err) {
       console.error('添加柜机失败:', err);
     }
-  }, [isAuthenticated, cabinets]);
+  }, [isAuthenticated]);
 
   /**
    * 批量生成带标签柜机

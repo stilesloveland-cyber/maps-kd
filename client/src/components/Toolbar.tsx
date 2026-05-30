@@ -93,16 +93,18 @@ const Toolbar: React.FC<ToolbarProps> = ({
   useEffect(() => {
     if (debouncedQuery.trim()) {
       const query = debouncedQuery.toLowerCase();
-      const results = cabinets.filter(
-        (c) =>
-          c.number.toLowerCase().includes(query) ||
-          c.name.toLowerCase().includes(query),
-      );
+      const results = cabinets.filter((c) => {
+        if (c.number.toLowerCase().includes(query)) return true;
+        if (c.name.toLowerCase().includes(query)) return true;
+        const brandTag = tags.find((t) => (c.tags || []).includes(t.id) && t.category === 'brand');
+        if (brandTag && brandTag.name.toLowerCase().includes(query)) return true;
+        return false;
+      });
       setSearchResults(results);
     } else {
       setSearchResults([]);
     }
-  }, [debouncedQuery, cabinets]);
+  }, [debouncedQuery, cabinets, tags]);
 
   /**
    * 点击搜索结果，跳转到对应柜机位置
@@ -144,7 +146,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <input
             type="text"
             className="search-input"
-            placeholder="搜索柜机编号/名称..."
+            placeholder="搜索编号/名称/品牌..."
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             onFocus={() => searchResults.length > 0 && setShowResults(true)}
@@ -159,20 +161,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
         {showResults && (
           <div className="search-dropdown">
             {searchResults.length > 0 ? (
-              searchResults.map((cabinet) => (
-                <div
-                  key={cabinet.id}
-                  className="search-dropdown-item"
-                  onClick={() => handleSelectResult(cabinet)}
-                >
-                  <span className="search-dropdown-number">
-                    {(() => {
-                      const brandTag = tags.find((t) => (cabinet.tags || []).includes(t.id) && t.category === 'brand');
-                      return brandTag ? `${brandTag.name}${cabinet.name}` : cabinet.name;
-                    })()}
-                  </span>
-                </div>
-              ))
+              searchResults.map((cabinet) => {
+                const brandTag = tags.find((t) => (cabinet.tags || []).includes(t.id) && t.category === 'brand');
+                return (
+                  <div
+                    key={cabinet.id}
+                    className="search-dropdown-item"
+                    onClick={() => handleSelectResult(cabinet)}
+                  >
+                    <span className="search-dropdown-number">{cabinet.number}</span>
+                    <span className="search-dropdown-name">
+                      {brandTag ? `${brandTag.name}` : ''}{cabinet.name}
+                    </span>
+                  </div>
+                );
+              })
             ) : (
               <div className="search-dropdown-empty">未找到匹配的柜机</div>
             )}

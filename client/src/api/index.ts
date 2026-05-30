@@ -87,6 +87,9 @@ async function request<T>(
 /** 获取所有柜机列表（公开） */
 export const getCabinets = (): Promise<Cabinet[]> => request<Cabinet[]>('/api/cabinets');
 
+export const getNextNumber = (): Promise<{ number: string; num: number }> =>
+  request<{ number: string; num: number }>('/api/cabinets/next-number');
+
 /** 新增柜机（需登录） */
 export const createCabinet = (data: CreateCabinetRequest): Promise<Cabinet> =>
   request<Cabinet>('/api/cabinets', {

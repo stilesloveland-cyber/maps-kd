@@ -158,6 +158,8 @@
 | 37 | 交互逻辑修复 | MapCanvas.tsx, MapPage.tsx | 移除 cache()、点击选中不跳中央、panToCabinet 可视区域判断、移除信息精简模式 |
 | 38 | 移动端精简 | MapPage.tsx, Toolbar.tsx | 移动端仅保留查看+筛选+搜索，隐藏所有管理按钮 |
 | 39 | 地图背景优化 | MapCanvas.tsx | 纯白背景改为淡灰点阵网格（#cbd5e1 圆点，50px间距） |
+| 40 | 搜索扩展+编号名一致 | Toolbar.tsx, MapPage.tsx | 搜索支持品牌标签名匹配（如搜"丰巢"），结果展示编号+品牌+名称；创建柜机时 name 从 number 数字部分生成（C-02→2号柜） |
+| 41 | 编号智能分配 | cabinets.ts, api/index.ts, MapPage.tsx | 新增 GET /api/cabinets/next-number 接口，优先填补已删除编号空缺（如 C-02 删除后新建分配 C-02）；移除前端 generateNumber 本地函数，改为调用后端 API |
 
 ---
 

@@ -281,6 +281,20 @@ router.get('/template', (_req: Request, res: Response): void => {
  *       200:
  *         description: 柜机列表
  */
+router.get('/next-number', (_req: Request, res: Response): void => {
+  const db = getDatabase();
+  const cabinets = db.prepare("SELECT number FROM cabinets WHERE number LIKE 'C-%'").all() as Array<{ number: string }>;
+  const usedNumbers = new Set<number>();
+  for (const cab of cabinets) {
+    const match = cab.number.match(/C-(\d+)/);
+    if (match) usedNumbers.add(parseInt(match[1]));
+  }
+  let nextNum = 1;
+  while (usedNumbers.has(nextNum)) nextNum++;
+  const nextNumber = `C-${String(nextNum).padStart(2, '0')}`;
+  res.json({ number: nextNumber, num: nextNum });
+});
+
 router.get('/', (_req: Request, res: Response): void => {
   const db = getDatabase();
   const cabinets = db.prepare('SELECT * FROM cabinets ORDER BY createdAt ASC').all();

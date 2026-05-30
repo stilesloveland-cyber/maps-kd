@@ -1,6 +1,6 @@
 {
   "appName": "快递柜可视化地图管理系统",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "一个可部署在服务器上的Web应用，用于可视化查看和管理快递驿站不同编号快递柜的相对位置。支持地图式拖拽、缩放、标签筛选、柜机管理、操作日志、版本备份与回滚、管理员权限控制、全局搜索及移动端适配。",
   "techStack": {
     "frontend": {
@@ -704,6 +704,41 @@
         "client/src/components/MapCanvas.tsx — 移除cache、修复多选拖拽、移除精简模式、优化文字显示、panToCabinet可视区域判断",
         "client/src/pages/MapPage.tsx — handleSelectCabinet不平移、移动端隐藏管理按钮",
         "client/src/components/Toolbar.tsx — 移动端隐藏管理按钮、UI现代化"
+      ]
+    },
+    {
+      "id": "F042",
+      "name": "搜索支持按柜机名/编号/品牌名搜索",
+      "description": "当前搜索仅匹配 number 和 name 字段，但用户搜索品牌名（如'丰巢'）或标签名时搜不到。需要扩展搜索范围，同时修复编号(number)和柜机名(name)不一致的问题。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "搜索匹配范围扩展：number（编号如C-02）、name（名称如2号柜）、品牌标签名（如丰巢、袋鼠）",
+        "搜索结果下拉列表中显示完整信息：编号 + 名称 + 品牌标签名",
+        "搜索结果点击后跳转到对应柜机并高亮",
+        "柜机名(name)与编号(number)的数字部分保持一致：创建时 name 自动从 number 提取数字生成（如 C-02 → 2号柜）"
+      ],
+      "filesToModify": [
+        "client/src/components/Toolbar.tsx — 搜索逻辑增加品牌标签名匹配",
+        "client/src/pages/MapPage.tsx — 创建柜机时 name 从 number 提取数字"
+      ]
+    },
+    {
+      "id": "F043",
+      "name": "柜机编号智能分配（填补空缺）",
+      "description": "删除柜机后（如 C-02），新建柜机时编号从最大值+1开始（C-13），导致编号不连续。需要实现智能编号分配，优先填补已删除的编号空缺。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "新建单个柜机时，编号分配逻辑：先找 C-01~C-99 中最小的未使用编号，而非最大编号+1",
+        "例如已有 C-01, C-03, C-04，新建时应分配 C-02（填补空缺），而非 C-05",
+        "如果没有空缺，则分配最大编号+1",
+        "批量生成时仍按最大编号递增（不填补空缺），因为批量生成需要连续编号",
+        "后端新增 API GET /api/cabinets/next-number 返回下一个可用编号",
+        "前端 generateNumber 函数改为调用后端 API 获取"
+      ],
+      "filesToModify": [
+        "server/src/routes/cabinets.ts — 新增 GET /api/cabinets/next-number 接口",
+        "client/src/api/index.ts — 新增 getNextNumber API 函数",
+        "client/src/pages/MapPage.tsx — generateNumber 改为调用后端 API"
       ]
     }
   ],
