@@ -334,6 +334,17 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
       if (!cab) return;
       const cw = cab.width || CABINET_DEFAULT_WIDTH;
       const ch = cab.height || CABINET_DEFAULT_HEIGHT;
+      const cabScreenX = cab.x * stageConfig.scale + stageConfig.x;
+      const cabScreenY = cab.y * stageConfig.scale + stageConfig.y;
+      const cabScreenW = cw * stageConfig.scale;
+      const cabScreenH = ch * stageConfig.scale;
+      const margin = 80;
+      const isVisible =
+        cabScreenX >= -margin &&
+        cabScreenX + cabScreenW <= containerSize.width + margin &&
+        cabScreenY >= -margin &&
+        cabScreenY + cabScreenH <= containerSize.height + margin;
+      if (isVisible) return;
       setStageConfig((prev) => ({
         x: containerSize.width / 2 - (cab.x + cw / 2) * prev.scale,
         y: containerSize.height / 2 - (cab.y + ch / 2) * prev.scale,
@@ -600,17 +611,21 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             y={0}
             width={DEFAULT_WIDTH}
             height={DEFAULT_HEIGHT}
-            fill="#fafafa"
+            fill="#f8fafc"
           />
-          {/* 网格线 */}
-          {gridLines.map((line, i) => (
-            <Line
-              key={i}
-              points={line.points}
-              stroke={GRID_COLOR}
-              strokeWidth={GRID_STROKE_WIDTH}
-            />
-          ))}
+          {/* 点阵网格背景 */}
+          {Array.from({ length: Math.ceil(DEFAULT_WIDTH / GRID_SIZE) + 1 }, (_, xi) =>
+            Array.from({ length: Math.ceil(DEFAULT_HEIGHT / GRID_SIZE) + 1 }, (_, yi) => (
+              <Circle
+                key={`dot-${xi}-${yi}`}
+                x={xi * GRID_SIZE}
+                y={yi * GRID_SIZE}
+                radius={1}
+                fill="#cbd5e1"
+                listening={false}
+              />
+            ))
+          )}
         </Layer>
 
         {/* 区域层 */}
@@ -791,46 +806,6 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
 
             // F037: 文字颜色自适应底色亮度
             const textColor = isSearchHighlight ? '#22c55e' : getContrastColor(fillColor);
-            const brandTextColor = isSearchHighlight ? '#22c55e' : getContrastColor(fillColor);
-            const labelBgColor = getLabelBgColor(fillColor);
-
-            // F038: 根据缩放级别精简显示
-            const scale = stageConfig.scale;
-            const isAlwaysFull = isSelected || isSearchHighlight;
-            let displayMode: 'full' | 'compact' | 'minimal';
-            if (isAlwaysFull) {
-              displayMode = 'full';
-            } else if (scale >= 1.0) {
-              displayMode = 'full';
-            } else if (scale >= 0.6) {
-              displayMode = 'compact';
-            } else {
-              displayMode = 'minimal';
-            }
-
-            // 精简文字
-            const cabinetNum = cabinet.name.replace(/[^0-9]/g, '') || cabinet.name;
-            const brandInitial = brandName ? brandName.charAt(0) : '';
-            let displayBrand = '';
-            let displayName = '';
-            let nameFontSize = 14;
-            let brandFontSize = 10;
-            if (displayMode === 'full') {
-              displayBrand = brandName;
-              displayName = cabinet.name;
-              nameFontSize = isSearchHighlight ? 16 : 14;
-              brandFontSize = isSearchHighlight ? 11 : 10;
-            } else if (displayMode === 'compact') {
-              displayBrand = brandInitial;
-              displayName = cabinetNum;
-              nameFontSize = 12;
-              brandFontSize = 9;
-            } else {
-              displayBrand = '';
-              displayName = cabinetNum;
-              nameFontSize = 11;
-              brandFontSize = 9;
-            }
 
             const isMobile = containerSize.width < 768;
             let showName = true;
@@ -839,7 +814,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             } else if (isMobile) {
               showName = scale >= 1.0;
             } else {
-              showName = scale >= 0.8;
+              showName = scale >= 0.5;
             }
 
             // 使用拖拽缓存位置（如果有），避免重绘闪烁
@@ -850,6 +825,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             return (
               <Group
                 key={cabinet.id}
+                id={cabinet.id}
                 x={posX}
                 y={posY}
                 width={w}
@@ -877,17 +853,19 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   const node = e.target;
                   const dx = node.x() - (multiDragStartRef.current.get(cabinet.id)?.x ?? cabinet.x);
                   const dy = node.y() - (multiDragStartRef.current.get(cabinet.id)?.y ?? cabinet.y);
+                  const stage = stageRef.current;
+                  if (!stage) return;
                   for (const id of selectedIds) {
                     if (id === cabinet.id) continue;
                     const startPos = multiDragStartRef.current.get(id);
                     if (startPos) {
-                      draggedPositionsRef.current.set(id, { x: startPos.x + dx, y: startPos.y + dy });
+                      const newPos = { x: startPos.x + dx, y: startPos.y + dy };
+                      draggedPositionsRef.current.set(id, newPos);
+                      const groupNode = stage.findOne(`#${id}`);
+                      if (groupNode) {
+                        groupNode.position(newPos);
+                      }
                     }
-                  }
-                }}
-                ref={(node) => {
-                  if (node && !node.isCached()) {
-                    node.cache();
                   }
                 }}
                 onClick={(e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -1041,30 +1019,22 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                     listening={false}
                   />
                 )}
-                {/* F037: 文字背景条（增强可读性） */}
-                {showName && (
-                  <Rect
-                    x={4}
-                    y={displayBrand ? h * 0.12 : h * 0.2}
-                    width={w - 8}
-                    height={displayBrand ? h * 0.76 : h * 0.6}
-                    cornerRadius={4}
-                    fill={labelBgColor}
-                    listening={false}
-                  />
-                )}
                 {/* 品牌/标签名（上方，小字） */}
-                {displayBrand && showName && (
+                {brandName && showName && (
                   <Text
                     x={0}
                     y={h * 0.15}
                     width={w}
                     height={h * 0.35}
-                    text={displayBrand}
-                    fontSize={brandFontSize}
-                    fill={brandTextColor}
+                    text={brandName}
+                    fontSize={isSearchHighlight ? 11 : 10}
+                    fill={textColor}
                     align="center"
                     verticalAlign="middle"
+                    shadowColor="rgba(0,0,0,0.4)"
+                    shadowBlur={2}
+                    shadowOffsetX={0}
+                    shadowOffsetY={1}
                     listening={false}
                   />
                 )}
@@ -1072,15 +1042,19 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                 {showName && (
                   <Text
                     x={0}
-                    y={displayBrand ? h * 0.4 : 0}
+                    y={brandName ? h * 0.4 : 0}
                     width={w}
-                    height={displayBrand ? h * 0.6 : h}
-                    text={displayName}
-                    fontSize={nameFontSize}
+                    height={brandName ? h * 0.6 : h}
+                    text={cabinet.name}
+                    fontSize={isSearchHighlight ? 16 : 14}
                     fontStyle="bold"
                     fill={textColor}
                     align="center"
                     verticalAlign="middle"
+                    shadowColor="rgba(0,0,0,0.4)"
+                    shadowBlur={2}
+                    shadowOffsetX={0}
+                    shadowOffsetY={1}
                     listening={false}
                   />
                 )}

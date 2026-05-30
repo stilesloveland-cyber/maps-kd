@@ -89,13 +89,10 @@ const MapPage: React.FC = () => {
   const mapCanvasRef = useRef<MapCanvasRef>(null);
 
   /**
-   * 选中柜机并平移到视图中央
+   * 选中柜机（不平移视图）
    */
   const handleSelectCabinet = useCallback((cabinetId: string | null) => {
     setSelectedCabinetId(cabinetId);
-    if (cabinetId) {
-      setTimeout(() => mapCanvasRef.current?.panToCabinet(cabinetId), 50);
-    }
   }, []);
 
   // ==================== 数据加载 ====================
@@ -167,7 +164,6 @@ const MapPage: React.FC = () => {
       });
       setCabinets((prev) => [...prev, newCabinet]);
       setSelectedCabinetId(newCabinet.id);
-      setTimeout(() => mapCanvasRef.current?.panToCabinet(newCabinet.id), 100);
     } catch (err) {
       console.error('添加柜机失败:', err);
     }
@@ -538,8 +534,8 @@ const MapPage: React.FC = () => {
         onResetView={handleResetView}
         onOpenLogin={() => setShowLoginModal(true)}
       />
-      {/* 批量操作工具栏 */}
-      <div className="batch-bar">
+      {/* 批量操作工具栏（仅桌面端） */}
+      <div className="batch-bar desktop-only">
         <button
           className={`btn btn-sm ${isMultiSelectMode ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => {
@@ -657,16 +653,6 @@ const MapPage: React.FC = () => {
         <button className="fab-btn" onClick={() => setMobileFilterOpen(true)} title="筛选">
           <Filter size={18} />
         </button>
-        {isAuthenticated && (
-          <>
-            <button className="fab-btn" onClick={handleAddCabinet} title="添加柜机">
-              <Plus size={18} />
-            </button>
-            <button className="fab-btn fab-btn-primary" onClick={() => setShowBatchModal(true)} title="批量生成">
-              <Layers size={18} />
-            </button>
-          </>
-        )}
       </div>
 
       {/* 移动端筛选面板 */}

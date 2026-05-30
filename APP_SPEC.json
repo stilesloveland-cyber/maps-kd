@@ -1,6 +1,6 @@
 {
   "appName": "快递柜可视化地图管理系统",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "一个可部署在服务器上的Web应用，用于可视化查看和管理快递驿站不同编号快递柜的相对位置。支持地图式拖拽、缩放、标签筛选、柜机管理、操作日志、版本备份与回滚、管理员权限控制、全局搜索及移动端适配。",
   "techStack": {
     "frontend": {
@@ -682,6 +682,28 @@
       "filesToModify": [
         "client/src/components/MapCanvas.tsx — onDragMove/onDragEnd 增加多选批量移动逻辑",
         "client/src/pages/MapPage.tsx — 新增 handleBatchPositionUpdate 回调"
+      ]
+    },
+    {
+      "id": "F041",
+      "name": "交互逻辑全面修复 + UI现代化",
+      "description": "修复当前存在的核心交互问题，同时优化UI为简洁美观的现代化风格，移动端仅保留查看和筛选功能。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "【修复1】多选拖拽实时同步：onDragMove 中直接操作 Konva 节点移动其他选中柜机，每个柜机 Group 添加 id 属性",
+        "【修复2】移除 node.cache()：删除柜机 Group 上的 cache() 调用",
+        "【修复3】点击选中不再跳中央：handleSelectCabinet 仅设置 selectedCabinetId 不平移；仅搜索跳转和新建柜机时平移；panToCabinet 增加可视区域判断",
+        "【修复4】移除信息精简模式：删除 compact/minimal 显示逻辑，柜机始终显示完整品牌名+柜机名，不根据缩放级别截断文字",
+        "【修复5】移除大面积背景条：改用文字阴影（shadowColor+shadowBlur）增强可读性，保留 getContrastColor 自适应文字颜色",
+        "【修复6】移动端精简功能：移动端（<768px）隐藏添加柜机、批量生成、添加注释、添加区域、多选模式等管理按钮，仅保留查看+筛选+搜索",
+        "【修复7】UI现代化：工具栏使用更紧凑的布局，按钮间距统一，图标+文字组合更清晰，整体风格简洁现代",
+        "【修复8】视图中心稳定：除搜索跳转外，任何操作（点击选中、新建柜机等）都不自动平移视图；新建柜机放在当前视口中心但不平移；panToCabinet 仅搜索跳转调用且柜机不在视口内时才平移",
+        "【修复9】地图背景优化：画布背景从纯白色改为淡灰色点阵网格（类似设计软件的画布背景），增强空间感和定位参考；网格点间距50px，颜色#e2e8f0，半径1px"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — 移除cache、修复多选拖拽、移除精简模式、优化文字显示、panToCabinet可视区域判断",
+        "client/src/pages/MapPage.tsx — handleSelectCabinet不平移、移动端隐藏管理按钮",
+        "client/src/components/Toolbar.tsx — 移动端隐藏管理按钮、UI现代化"
       ]
     }
   ],

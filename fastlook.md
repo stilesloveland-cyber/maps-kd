@@ -151,6 +151,13 @@
 | 30 | 缩放按钮修复 | MapPage.tsx, MapCanvas.tsx | 修复 +/- 缩放按钮无响应问题，通过 MapCanvas ref 的 zoomIn/zoomOut 方法 |
 | 31 | 搜索高亮增强 | MapCanvas.tsx | 搜索选中柜机增加脉冲呼吸动画（shadowBlur 20→35，3秒）、边框 4px、名称 16px 绿色 |
 | 32 | deploy.sh 增强 | deploy.sh, deploy.ps1 | 新增 6 个交互菜单（状态/日志/重启/备份）、彩色输出、磁盘检查、Docker 检测、kd 快捷命令指引 |
+| 33 | 柜机品牌标签显示 | MapCanvas.tsx | 品牌名显示在柜机名上方（小字），如「丰巢」+「1号柜」 |
+| 34 | 文字对比度自适应 | MapCanvas.tsx | getContrastColor 根据底色亮度自动切换深/浅文字色 + 文字阴影增强可读性 |
+| 35 | 多选视觉增强 | MapCanvas.tsx | 蓝色虚线边框 + 半透明蓝色遮罩 + 左上角序号标记 |
+| 36 | 多选批量拖拽 | MapCanvas.tsx, MapPage.tsx | 拖动一个选中柜机，其他选中柜机同步移动（Konva 节点直操） |
+| 37 | 交互逻辑修复 | MapCanvas.tsx, MapPage.tsx | 移除 cache()、点击选中不跳中央、panToCabinet 可视区域判断、移除信息精简模式 |
+| 38 | 移动端精简 | MapPage.tsx, Toolbar.tsx | 移动端仅保留查看+筛选+搜索，隐藏所有管理按钮 |
+| 39 | 地图背景优化 | MapCanvas.tsx | 纯白背景改为淡灰点阵网格（#cbd5e1 圆点，50px间距） |
 
 ---
 
@@ -190,9 +197,10 @@ export interface MapCanvasRef {
 - 3 秒自动消失，右上角滑入
 
 ### 4.6 性能优化要点
-- **Canvas 缓存**：柜机 `<Group>` 通过 callback ref 调用 `node.cache()`
+- **拖拽位置缓存**：柜机拖拽时通过 `draggedPositionsRef` 缓存位置，避免 React 全量重绘
 - **搜索防抖**：`useDebounce` hook 延迟 200ms
 - **React.memo**：`FilterPanel` 和 `DetailPanel` 用 `React.memo` 包裹
+- **多选拖拽直操**：多选拖拽时直接操作 Konva 节点（`stage.findOne` + `node.position()`），绕过 React 渲染循环
 
 ### 4.7 数据库 Schema 变更兼容
 - 使用 `addColumnIfNotExists` 函数以 `ALTER TABLE ADD COLUMN` + try-catch 方式添加新字段
