@@ -751,7 +751,11 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
               : cabStroke;
             const strokeWidth = isSelected ? 3 : isSearchHighlight ? searchBorderW : isMultiSelected ? 3 : cabStrokeW;
 
-            // 柜机名称可见性：根据缩放级别动态控制
+            // 获取品牌/标签名（第一个 brand 标签）
+            const brandTag = cabinet.tags && cabinet.tags.length > 0
+              ? tags.find((t) => cabinet.tags.includes(t.id) && t.category === 'brand')
+              : null;
+            const brandName = brandTag ? brandTag.name : '';
             const isMobile = containerSize.width < 768;
             let showName = true;
             if (isSelected || isSearchHighlight) {
@@ -896,12 +900,28 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   shadowOpacity={isSelected ? 0.4 : 0}
                 />
                 {/* 柜机名称（居中大字：品牌x号机） */}
+                {/* 品牌/标签名（上方，小字） */}
+                {brandName && (
+                  <Text
+                    x={0}
+                    y={h * 0.15}
+                    width={w}
+                    height={h * 0.35}
+                    text={brandName}
+                    fontSize={isSearchHighlight ? 11 : 10}
+                    fill={isSearchHighlight ? '#22c55e' : '#64748b'}
+                    align="center"
+                    verticalAlign="middle"
+                    visible={showName}
+                  />
+                )}
+                {/* 柜机名称（X号柜，居中大字） */}
                 <Text
                   x={0}
-                  y={0}
+                  y={brandName ? h * 0.4 : 0}
                   width={w}
-                  height={h}
-                  text={`${getCabinetBrand(cabinet, tags)}${cabinet.name}`}
+                  height={brandName ? h * 0.6 : h}
+                  text={cabinet.name}
                   fontSize={isSearchHighlight ? 16 : 14}
                   fontStyle="bold"
                   fill={isSearchHighlight ? '#22c55e' : '#1e293b'}
