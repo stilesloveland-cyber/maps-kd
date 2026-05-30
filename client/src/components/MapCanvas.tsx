@@ -799,12 +799,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             // F037: 文字颜色自适应底色亮度
             const textColor = isSearchHighlight ? '#22c55e' : getContrastColor(fillColor);
 
-            const isMobile = containerSize.width < 768;
             const scale = stageConfig.scale;
-            let showName = true;
-            if (isMobile && !isSelected && !isSearchHighlight) {
-              showName = scale >= 0.6;
-            }
 
             // 使用拖拽缓存位置（如果有），避免重绘闪烁
             const draggedPos = draggedPositionsRef.current.get(cabinet.id);
@@ -1009,7 +1004,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   />
                 )}
                 {/* 品牌/标签名（上方，小字） */}
-                {brandName && showName && (
+                {brandName && (
                   <Text
                     x={0}
                     y={h * 0.15}
@@ -1028,7 +1023,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   />
                 )}
                 {/* 柜机名称（X号柜，居中大字） */}
-                {showName && (
+                (
                   <Text
                     x={0}
                     y={brandName ? h * 0.4 : 0}
