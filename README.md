@@ -204,6 +204,7 @@ Frontend (React 18 + TypeScript + Vite)
 | PUT | `/api/cabinets/:id/tags` | 更新柜机标签 | ✅ |
 | GET | `/api/tags` | 获取所有标签 | ❌ |
 | POST | `/api/tags` | 新增标签 | ✅ |
+| PUT | `/api/tags/:id` | 更新标签 | ✅ |
 | DELETE | `/api/tags/:id` | 删除标签 | ✅ |
 | GET | `/api/zones` | 获取所有区域 | ❌ |
 | POST | `/api/zones` | 新增区域 | ✅ |

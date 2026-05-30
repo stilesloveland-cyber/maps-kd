@@ -808,6 +808,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             const textColor = isSearchHighlight ? '#22c55e' : getContrastColor(fillColor);
 
             const isMobile = containerSize.width < 768;
+            const scale = stageConfig.scale;
             let showName = true;
             if (isSelected || isSearchHighlight) {
               showName = true;
