@@ -1026,7 +1026,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   />
                 )}
                 {/* 柜机名称（X号柜，居中大字） */}
-                (
+                {(
                   <Text
                     x={0}
                     y={brandName ? h * 0.4 : 0}
