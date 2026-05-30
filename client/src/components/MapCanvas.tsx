@@ -216,6 +216,8 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   // 触屏单指拖动起始位置
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const touchStagePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const stageConfigRef = useRef(stageConfig);
+  stageConfigRef.current = stageConfig;
 
   // 柜机拖拽中标志（避免容器平移逻辑干扰柜机拖拽）
   const cabinetDraggingRef = useRef(false);
@@ -388,26 +390,22 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
    */
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
-
     const stage = stageRef.current;
     if (!stage) return;
 
-    const oldScale = stageConfig.scale;
+    const oldScale = stageConfigRef.current.scale;
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
 
-    // 计算缩放因子（滚轮向上放大，向下缩小）
     const scaleBy = 1.1;
     const direction = e.evt.deltaY > 0 ? -1 : 1;
     const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
 
-    // 限制缩放范围
     const clampedScale = Math.max(0.2, Math.min(3, newScale));
 
-    // 以鼠标位置为缩放中心
     const mousePointTo = {
-      x: (pointer.x - stageConfig.x) / oldScale,
-      y: (pointer.y - stageConfig.y) / oldScale,
+      x: (pointer.x - stageConfigRef.current.x) / oldScale,
+      y: (pointer.y - stageConfigRef.current.y) / oldScale,
     };
 
     setStageConfig({
@@ -415,21 +413,20 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
       x: pointer.x - mousePointTo.x * clampedScale,
       y: pointer.y - mousePointTo.y * clampedScale,
     });
-  }, [stageConfig]);
+  }, []);
 
   /**
    * 鼠标按下 - 开始拖拽平移视图
    */
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    // 只在空白区域拖拽，不选中柜机时
     mouseDragRef.current = {
       isDown: true,
       startX: e.evt.clientX,
       startY: e.evt.clientY,
-      stageX: stageConfig.x,
-      stageY: stageConfig.y,
+      stageX: stageConfigRef.current.x,
+      stageY: stageConfigRef.current.y,
     };
-  }, [stageConfig]);
+  }, []);
 
   /**
    * 鼠标移动 - 拖拽平移视图
@@ -438,12 +435,12 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
     if (!mouseDragRef.current.isDown) return;
     const dx = e.evt.clientX - mouseDragRef.current.startX;
     const dy = e.evt.clientY - mouseDragRef.current.startY;
-    setStageConfig({
-      ...stageConfig,
+    setStageConfig((prev) => ({
+      ...prev,
       x: mouseDragRef.current.stageX + dx,
       y: mouseDragRef.current.stageY + dy,
-    });
-  }, [stageConfig]);
+    }));
+  }, []);
 
   /**
    * 鼠标释放 - 结束拖拽
@@ -458,14 +455,13 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   const handleTouchStart = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     const touchCount = e.evt.touches.length;
     if (touchCount === 1) {
-      // 单指拖动：记录起始位置
       touchStartPosRef.current = {
         x: e.evt.touches[0].clientX,
         y: e.evt.touches[0].clientY,
       };
-      touchStagePosRef.current = { x: stageConfig.x, y: stageConfig.y };
+      touchStagePosRef.current = { x: stageConfigRef.current.x, y: stageConfigRef.current.y };
     }
-  }, [stageConfig]);
+  }, []);
 
   /**
    * 触屏事件 - 移动（单指拖动 + 双指缩放）
@@ -474,16 +470,14 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
     const touchCount = e.evt.touches.length;
 
     if (touchCount === 1 && touchStartPosRef.current) {
-      // 单指拖动：根据手指移动偏移量平移视图
       const dx = e.evt.touches[0].clientX - touchStartPosRef.current.x;
       const dy = e.evt.touches[0].clientY - touchStartPosRef.current.y;
-      setStageConfig({
-        ...stageConfig,
+      setStageConfig((prev) => ({
+        ...prev,
         x: touchStagePosRef.current.x + dx,
         y: touchStagePosRef.current.y + dy,
-      });
+      }));
     } else if (touchCount === 2) {
-      // 双指缩放
       e.evt.preventDefault();
       const touch1 = e.evt.touches[0];
       const touch2 = e.evt.touches[1];
@@ -491,7 +485,6 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
         (touch2.clientX - touch1.clientX) ** 2 +
           (touch2.clientY - touch1.clientY) ** 2,
       );
-      // 双指中心点
       const centerX = (touch1.clientX + touch2.clientX) / 2;
       const centerY = (touch1.clientY + touch2.clientY) / 2;
       const rect = containerRef.current?.getBoundingClientRect();
@@ -499,27 +492,26 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
 
       if (lastTouchDistRef.current !== null) {
         const scaleBy = dist / lastTouchDistRef.current;
-        const oldScale = stageConfig.scale;
-        const newScale = oldScale * scaleBy;
-        const clampedScale = Math.max(0.2, Math.min(3, newScale));
-
-        const pointerX = centerX - rect.left;
-        const pointerY = centerY - rect.top;
-
-        const mousePointTo = {
-          x: (pointerX - stageConfig.x) / oldScale,
-          y: (pointerY - stageConfig.y) / oldScale,
-        };
-
-        setStageConfig({
-          scale: clampedScale,
-          x: pointerX - mousePointTo.x * clampedScale,
-          y: pointerY - mousePointTo.y * clampedScale,
+        setStageConfig((prev) => {
+          const oldScale = prev.scale;
+          const newScale = oldScale * scaleBy;
+          const clampedScale = Math.max(0.2, Math.min(3, newScale));
+          const pointerX = centerX - rect.left;
+          const pointerY = centerY - rect.top;
+          const mousePointTo = {
+            x: (pointerX - prev.x) / oldScale,
+            y: (pointerY - prev.y) / oldScale,
+          };
+          return {
+            scale: clampedScale,
+            x: pointerX - mousePointTo.x * clampedScale,
+            y: pointerY - mousePointTo.y * clampedScale,
+          };
         });
       }
       lastTouchDistRef.current = dist;
     }
-  }, [stageConfig]);
+  }, []);
 
   /**
    * 触屏结束重置状态
@@ -569,11 +561,11 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
           // 拖动超过3px认为是拖拽动作，取消柜机选中
           if (selectedCabinetId) onSelectCabinet(null);
         }
-        setStageConfig({
-          ...stageConfig,
+        setStageConfig((prev) => ({
+          ...prev,
           x: mouseDragRef.current.stageX + dx,
           y: mouseDragRef.current.stageY + dy,
-        });
+        }));
       }}
       onMouseUp={() => { mouseDragRef.current.isDown = false; }}
       onMouseLeave={() => { mouseDragRef.current.isDown = false; }}
@@ -810,12 +802,8 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
             const isMobile = containerSize.width < 768;
             const scale = stageConfig.scale;
             let showName = true;
-            if (isSelected || isSearchHighlight) {
-              showName = true;
-            } else if (isMobile) {
-              showName = scale >= 1.0;
-            } else {
-              showName = scale >= 0.5;
+            if (isMobile && !isSelected && !isSearchHighlight) {
+              showName = scale >= 0.6;
             }
 
             // 使用拖拽缓存位置（如果有），避免重绘闪烁
