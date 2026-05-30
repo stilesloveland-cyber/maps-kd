@@ -425,9 +425,19 @@ const MapPage: React.FC = () => {
   const handleCabinetDragEnd = useCallback(async (cabinetId: string, x: number, y: number) => {
     try {
       await updateCabinetPosition(cabinetId, { x, y });
-      // 不触发全量 setCabinets，由 MapCanvas 内部通过 ref 保持位置同步
     } catch (err) {
       console.error('更新柜机位置失败:', err);
+    }
+  }, []);
+
+  /**
+   * 批量柜机位置更新（多选拖拽结束后）
+   */
+  const handleBatchPositionUpdate = useCallback(async (positions: Array<{ id: string; x: number; y: number }>) => {
+    try {
+      await Promise.all(positions.map((p) => updateCabinetPosition(p.id, { x: p.x, y: p.y })));
+    } catch (err) {
+      console.error('批量更新柜机位置失败:', err);
     }
   }, []);
 
@@ -598,6 +608,7 @@ const MapPage: React.FC = () => {
           searchHighlightId={searchHighlightId}
           onSelectCabinet={handleSelectCabinet}
           onCabinetDragEnd={handleCabinetDragEnd}
+          onBatchPositionUpdate={handleBatchPositionUpdate}
           addPosition={addPositionRef.current}
           onClickEmpty={handleClickEmpty}
           onZoneDragEnd={handleZoneDragEnd}

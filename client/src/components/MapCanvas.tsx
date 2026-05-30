@@ -75,6 +75,8 @@ interface MapCanvasProps {
   onSelectCabinet: (cabinetId: string | null) => void;
   /** 柜机位置拖拽结束回调 */
   onCabinetDragEnd: (cabinetId: string, x: number, y: number) => void;
+  /** 批量柜机位置更新回调（多选拖拽） */
+  onBatchPositionUpdate?: (positions: Array<{ id: string; x: number; y: number }>) => void;
   /** 添加柜机回调（由外部触发时传入坐标） */
   addPosition: { x: number; y: number } | null;
   /** 点击空白区域回调 */
@@ -135,6 +137,28 @@ const getCabinetBrand = (cabinet: Cabinet, allTags: Tag[]): string => {
   return brandTag ? brandTag.name : '';
 };
 
+/** 根据背景色亮度自动选择文字颜色（深底白字/浅底黑字） */
+const getContrastColor = (hexColor: string): string => {
+  const hex = hexColor.replace('#', '');
+  if (hex.length !== 6) return '#1e293b';
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? '#1e293b' : '#ffffff';
+};
+
+/** 根据背景色亮度选择背景条颜色 */
+const getLabelBgColor = (hexColor: string): string => {
+  const hex = hexColor.replace('#', '');
+  if (hex.length !== 6) return 'rgba(255,255,255,0.5)';
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.35)';
+};
+
 // ---------- 组件 ----------
 
 const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
@@ -147,6 +171,7 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
   searchHighlightId,
   onSelectCabinet,
   onCabinetDragEnd,
+  onBatchPositionUpdate,
   addPosition,
   onClickEmpty,
   onZoneDragEnd,
@@ -200,6 +225,10 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
 
   // 搜索高亮脉冲动画相位（0-1，用于呼吸效果）
   const [searchPulsePhase, setSearchPulsePhase] = useState(0);
+
+  // F040: 多选拖拽起始位置缓存
+  const multiDragStartRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const multiDragActiveRef = useRef(false);
 
   // 鼠标拖拽平移
   const mouseDragRef = useRef<{ isDown: boolean; startX: number; startY: number; stageX: number; stageY: number }>({
@@ -749,23 +778,68 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
               : isSearchHighlight
               ? '#22c55e'
               : isMultiSelected
-              ? '#8b5cf6'
+              ? '#3b82f6'
               : cabStroke;
-            const strokeWidth = isSelected ? 3 : isSearchHighlight ? searchBorderW : isMultiSelected ? 3 : cabStrokeW;
+            const strokeWidth = isSelected ? 3 : isSearchHighlight ? searchBorderW : isMultiSelected ? 2 : cabStrokeW;
+            const strokeDash = isMultiSelected && !isSelected && !isSearchHighlight ? [6, 4] : (cabinet.strokeStyle === 'dashed' ? [6, 4] : undefined);
 
             // 获取品牌/标签名（第一个 brand 标签）
             const brandTag = cabinet.tags && cabinet.tags.length > 0
               ? tags.find((t) => cabinet.tags.includes(t.id) && t.category === 'brand')
               : null;
             const brandName = brandTag ? brandTag.name : '';
+
+            // F037: 文字颜色自适应底色亮度
+            const textColor = isSearchHighlight ? '#22c55e' : getContrastColor(fillColor);
+            const brandTextColor = isSearchHighlight ? '#22c55e' : getContrastColor(fillColor);
+            const labelBgColor = getLabelBgColor(fillColor);
+
+            // F038: 根据缩放级别精简显示
+            const scale = stageConfig.scale;
+            const isAlwaysFull = isSelected || isSearchHighlight;
+            let displayMode: 'full' | 'compact' | 'minimal';
+            if (isAlwaysFull) {
+              displayMode = 'full';
+            } else if (scale >= 1.0) {
+              displayMode = 'full';
+            } else if (scale >= 0.6) {
+              displayMode = 'compact';
+            } else {
+              displayMode = 'minimal';
+            }
+
+            // 精简文字
+            const cabinetNum = cabinet.name.replace(/[^0-9]/g, '') || cabinet.name;
+            const brandInitial = brandName ? brandName.charAt(0) : '';
+            let displayBrand = '';
+            let displayName = '';
+            let nameFontSize = 14;
+            let brandFontSize = 10;
+            if (displayMode === 'full') {
+              displayBrand = brandName;
+              displayName = cabinet.name;
+              nameFontSize = isSearchHighlight ? 16 : 14;
+              brandFontSize = isSearchHighlight ? 11 : 10;
+            } else if (displayMode === 'compact') {
+              displayBrand = brandInitial;
+              displayName = cabinetNum;
+              nameFontSize = 12;
+              brandFontSize = 9;
+            } else {
+              displayBrand = '';
+              displayName = cabinetNum;
+              nameFontSize = 11;
+              brandFontSize = 9;
+            }
+
             const isMobile = containerSize.width < 768;
             let showName = true;
             if (isSelected || isSearchHighlight) {
               showName = true;
             } else if (isMobile) {
-              showName = stageConfig.scale >= 1.0;
+              showName = scale >= 1.0;
             } else {
-              showName = stageConfig.scale >= 0.8;
+              showName = scale >= 0.8;
             }
 
             // 使用拖拽缓存位置（如果有），避免重绘闪烁
@@ -782,7 +856,35 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                 height={h}
                 opacity={opacity}
                 draggable={isAuthenticated && !isFilterActive}
-                onDragStart={() => { cabinetDraggingRef.current = true; }}
+                onDragStart={(e: Konva.KonvaEventObject<DragEvent>) => {
+                  cabinetDraggingRef.current = true;
+                  if (isMultiSelected && selectedIds && selectedIds.size > 1) {
+                    multiDragActiveRef.current = true;
+                    multiDragStartRef.current.clear();
+                    for (const id of selectedIds) {
+                      const cab = cabinets.find((c) => c.id === id);
+                      if (cab) {
+                        const pos = draggedPositionsRef.current.get(id) || { x: cab.x, y: cab.y };
+                        multiDragStartRef.current.set(id, { x: pos.x, y: pos.y });
+                      }
+                    }
+                  } else {
+                    multiDragActiveRef.current = false;
+                  }
+                }}
+                onDragMove={(e: Konva.KonvaEventObject<DragEvent>) => {
+                  if (!multiDragActiveRef.current || !selectedIds) return;
+                  const node = e.target;
+                  const dx = node.x() - (multiDragStartRef.current.get(cabinet.id)?.x ?? cabinet.x);
+                  const dy = node.y() - (multiDragStartRef.current.get(cabinet.id)?.y ?? cabinet.y);
+                  for (const id of selectedIds) {
+                    if (id === cabinet.id) continue;
+                    const startPos = multiDragStartRef.current.get(id);
+                    if (startPos) {
+                      draggedPositionsRef.current.set(id, { x: startPos.x + dx, y: startPos.y + dy });
+                    }
+                  }
+                }}
                 ref={(node) => {
                   if (node && !node.isCached()) {
                     node.cache();
@@ -866,7 +968,32 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   }
                   node.position({ x: newX, y: newY });
                   draggedPositionsRef.current.set(cabinet.id, { x: newX, y: newY });
-                  onCabinetDragEnd(cabinet.id, newX, newY);
+
+                  if (multiDragActiveRef.current && selectedIds && selectedIds.size > 1) {
+                    const dx = newX - (multiDragStartRef.current.get(cabinet.id)?.x ?? cabinet.x);
+                    const dy = newY - (multiDragStartRef.current.get(cabinet.id)?.y ?? cabinet.y);
+                    const positions: Array<{ id: string; x: number; y: number }> = [{ id: cabinet.id, x: newX, y: newY }];
+                    for (const id of selectedIds) {
+                      if (id === cabinet.id) continue;
+                      const startPos = multiDragStartRef.current.get(id);
+                      if (startPos) {
+                        const finalX = startPos.x + dx;
+                        const finalY = startPos.y + dy;
+                        draggedPositionsRef.current.set(id, { x: finalX, y: finalY });
+                        positions.push({ id, x: finalX, y: finalY });
+                      }
+                    }
+                    if (onBatchPositionUpdate) {
+                      onBatchPositionUpdate(positions);
+                    } else {
+                      for (const p of positions) {
+                        onCabinetDragEnd(p.id, p.x, p.y);
+                      }
+                    }
+                    multiDragActiveRef.current = false;
+                  } else {
+                    onCabinetDragEnd(cabinet.id, newX, newY);
+                  }
                 }}
               >
                 {/* 选中/搜索高亮外发光 */}
@@ -896,41 +1023,67 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                   fill={fillColor}
                   stroke={strokeColor}
                   strokeWidth={strokeWidth}
-                  dash={cabinet.strokeStyle === 'dashed' ? [6, 4] : undefined}
+                  dash={strokeDash}
                   shadowColor={isSelected ? SELECTED_BORDER_COLOR : undefined}
                   shadowBlur={isSelected ? 10 : 0}
                   shadowOpacity={isSelected ? 0.4 : 0}
                 />
-                {/* 柜机名称（居中大字：品牌x号机） */}
+                {/* F039: 多选蓝色遮罩层 */}
+                {isMultiSelected && (
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={w}
+                    height={h}
+                    cornerRadius={CABINET_CORNER_RADIUS}
+                    fill="#3b82f6"
+                    opacity={0.15}
+                    listening={false}
+                  />
+                )}
+                {/* F037: 文字背景条（增强可读性） */}
+                {showName && (
+                  <Rect
+                    x={4}
+                    y={displayBrand ? h * 0.12 : h * 0.2}
+                    width={w - 8}
+                    height={displayBrand ? h * 0.76 : h * 0.6}
+                    cornerRadius={4}
+                    fill={labelBgColor}
+                    listening={false}
+                  />
+                )}
                 {/* 品牌/标签名（上方，小字） */}
-                {brandName && (
+                {displayBrand && showName && (
                   <Text
                     x={0}
                     y={h * 0.15}
                     width={w}
                     height={h * 0.35}
-                    text={brandName}
-                    fontSize={isSearchHighlight ? 11 : 10}
-                    fill={isSearchHighlight ? '#22c55e' : '#64748b'}
+                    text={displayBrand}
+                    fontSize={brandFontSize}
+                    fill={brandTextColor}
                     align="center"
                     verticalAlign="middle"
-                    visible={showName}
+                    listening={false}
                   />
                 )}
                 {/* 柜机名称（X号柜，居中大字） */}
-                <Text
-                  x={0}
-                  y={brandName ? h * 0.4 : 0}
-                  width={w}
-                  height={brandName ? h * 0.6 : h}
-                  text={cabinet.name}
-                  fontSize={isSearchHighlight ? 16 : 14}
-                  fontStyle="bold"
-                  fill={isSearchHighlight ? '#22c55e' : '#1e293b'}
-                  align="center"
-                  verticalAlign="middle"
-                  visible={showName}
-                />
+                {showName && (
+                  <Text
+                    x={0}
+                    y={displayBrand ? h * 0.4 : 0}
+                    width={w}
+                    height={displayBrand ? h * 0.6 : h}
+                    text={displayName}
+                    fontSize={nameFontSize}
+                    fontStyle="bold"
+                    fill={textColor}
+                    align="center"
+                    verticalAlign="middle"
+                    listening={false}
+                  />
+                )}
                 {/* 筛选匹配绿点标记 */}
                 {isFilterActive && filterMatch && (
                   <Circle
@@ -940,16 +1093,37 @@ const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(({
                     fill={FILTER_MATCH_GLOW_COLOR}
                   />
                 )}
-                {/* 多选模式选中标记 */}
-                {isMultiSelected && (
-                  <Circle
-                    x={w - 8}
-                    y={8}
-                    radius={8}
-                    fill="#8b5cf6"
-                    stroke="#fff"
-                    strokeWidth={2}
-                  />
+                {/* F039: 多选序号标记（替代紫色小圆点） */}
+                {isMultiSelected && selectedIds && (
+                  (() => {
+                    const idx = Array.from(selectedIds).indexOf(cabinet.id) + 1;
+                    return (
+                      <Group>
+                        <Circle
+                          x={12}
+                          y={12}
+                          radius={10}
+                          fill="#3b82f6"
+                          stroke="#fff"
+                          strokeWidth={2}
+                          listening={false}
+                        />
+                        <Text
+                          x={2}
+                          y={2}
+                          width={20}
+                          height={20}
+                          text={String(idx)}
+                          fontSize={11}
+                          fontStyle="bold"
+                          fill="#ffffff"
+                          align="center"
+                          verticalAlign="middle"
+                          listening={false}
+                        />
+                      </Group>
+                    );
+                  })()
                 )}
               </Group>
             );

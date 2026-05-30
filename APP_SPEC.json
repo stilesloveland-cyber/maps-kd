@@ -1,6 +1,6 @@
 {
   "appName": "快递柜可视化地图管理系统",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "一个可部署在服务器上的Web应用，用于可视化查看和管理快递驿站不同编号快递柜的相对位置。支持地图式拖拽、缩放、标签筛选、柜机管理、操作日志、版本备份与回滚、管理员权限控制、全局搜索及移动端适配。",
   "techStack": {
     "frontend": {
@@ -614,6 +614,74 @@
         "deploy.sh — 增加优化改进",
         "deploy.ps1 — 同步增强 Windows 版脚本功能",
         "新增文档：部署环境说明（如 ~/.bashrc 或 Windows Profile 的快捷命令配置指引）"
+      ]
+    },
+    {
+      "id": "F037",
+      "name": "柜机文字与底色对比度自适应",
+      "description": "当柜机底色较深时文字看不清，较浅时也不够醒目。需要根据底色亮度自动切换文字颜色，并为文字增加半透明背景条增强可读性。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "新增 getContrastColor(hexColor) 工具函数：解析 hex 颜色计算相对亮度，亮度 > 0.5 返回 '#1e293b'（深色文字），否则返回 '#ffffff'（白色文字）",
+        "柜机名称文字颜色根据 fillColor 自动计算，不再固定为 '#1e293b'",
+        "品牌标签名文字颜色同样自适应",
+        "柜机名称文字下方增加半透明白色/深色背景条（opacity 0.5），宽度与柜机同宽，高度覆盖文字区域，增强任何底色下的可读性",
+        "搜索高亮时文字颜色保持绿色 '#22c55e'，不受底色影响"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — 新增 getContrastColor 函数，柜机名称和品牌名文字颜色自适应，增加文字背景条"
+      ]
+    },
+    {
+      "id": "F038",
+      "name": "高密度柜机信息精简显示",
+      "description": "当画布上柜机数量多且缩放比例小时，所有柜机都显示完整名称导致信息堆叠。需要根据缩放级别逐步精简显示内容。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "scale ≥ 1.0：显示完整信息（品牌名 + 柜机名，如「丰巢 1号柜」）",
+        "0.6 ≤ scale < 1.0：精简显示（品牌首字 + 编号，如「丰1」）",
+        "scale < 0.6：仅显示编号色块（如「1」），隐藏品牌名",
+        "选中/搜索高亮的柜机始终显示完整信息，不受缩放级别影响",
+        "精简显示时字号适当缩小（精简模式 12px，极简模式 11px）",
+        "鼠标悬停（hover）时通过 Konva Tooltip 显示完整信息（品牌+名称+编号+标签）"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — 柜机文字渲染逻辑增加缩放级别判断"
+      ]
+    },
+    {
+      "id": "F039",
+      "name": "多选视觉反馈增强",
+      "description": "当前多选柜机仅有一个紫色小圆点标记，视觉反馈不明显。需要增强多选状态的视觉表现。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "多选柜机增加蓝色虚线边框（stroke: #3b82f6, dash: [6,4], strokeWidth: 2）",
+        "多选柜机增加半透明蓝色遮罩层（fill: #3b82f6, opacity: 0.15）覆盖在柜机主体上方",
+        "多选柜机左上角显示选中序号标记（白底蓝色圆形，内含数字，表示第几个被选中）",
+        "取消现有的紫色小圆点标记，替换为上述新视觉方案",
+        "多选柜机数量显示在批量操作栏中（已有，确认正常）"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — 多选柜机渲染逻辑重写"
+      ]
+    },
+    {
+      "id": "F040",
+      "name": "多选柜机批量拖拽移动",
+      "description": "当前多选柜机后无法一起拖动，只能单个移动。需要支持拖动任意一个已选柜机时，所有选中柜机同步移动相同偏移量。",
+      "priority": "high",
+      "acceptanceCriteria": [
+        "多选模式下，拖动任意一个已选中的柜机，所有选中柜机同步移动相同的 dx/dy 偏移量",
+        "拖动过程中实时更新所有选中柜机的位置（不等待拖动结束）",
+        "拖动结束后，批量调用后端 API 更新所有选中柜机的位置",
+        "批量移动时使用后端已有接口 PUT /api/cabinets/batch-move（需扩展支持位置更新），或逐个调用 PUT /api/cabinets/:id/position",
+        "拖动过程中，所有选中柜机保持相对位置不变",
+        "非多选模式下，拖动行为保持不变（单个柜机拖动）",
+        "批量拖动时吸附逻辑仅对被拖动的那个柜机生效，其他选中柜机跟随偏移"
+      ],
+      "filesToModify": [
+        "client/src/components/MapCanvas.tsx — onDragMove/onDragEnd 增加多选批量移动逻辑",
+        "client/src/pages/MapPage.tsx — 新增 handleBatchPositionUpdate 回调"
       ]
     }
   ],
